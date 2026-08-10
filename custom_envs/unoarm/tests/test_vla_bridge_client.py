@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
 from webapp.vla_bridge_client import (
     BridgeConfig,
     VlaBridgeClient,
@@ -56,9 +55,7 @@ def test_bridge_config_rejects_bad_arms() -> None:
 
 
 def test_client_posts_json_payload() -> None:
-    client = VlaBridgeClient(
-        BridgeConfig(enabled=True, base_url="http://192.168.10.38:8765", execute=False)
-    )
+    client = VlaBridgeClient(BridgeConfig(enabled=True, base_url="http://192.168.10.38:8765", execute=False))
     fake_resp = MagicMock()
     fake_resp.status = 200
     fake_resp.read.return_value = json.dumps({"ok": True, "points": 1}).encode("utf-8")

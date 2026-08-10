@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -158,7 +159,7 @@ class VlaBridgeClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=self.cfg.http_timeout_sec) as resp:
+            with urllib.request.urlopen(req, timeout=self.cfg.http_timeout_sec) as resp:  # nosec B310
                 payload = resp.read().decode("utf-8")
                 status = int(getattr(resp, "status", 200) or 200)
         except urllib.error.HTTPError as exc:

@@ -7,11 +7,11 @@ IK 逆解 / Web 录制产生的数据集体积过大，训练时 CPU 与内存�
 
 实测每帧体积（480×640 分辨率）：
 
-| 特征            | 当前存储             | 每帧大小 | 占比 |
-|-----------------|---------------------|----------|------|
-| RGB top         | parquet 原始 uint8  | 0.92 MB  | 20%  |
-| pointmap        | float32 原始        | 3.69 MB  | 80%  |
-| **合计**        |                     | **4.61 MB** |    |
+| 特征     | 当前存储           | 每帧大小    | 占比 |
+| -------- | ------------------ | ----------- | ---- |
+| RGB top  | parquet 原始 uint8 | 0.92 MB     | 20%  |
+| pointmap | float32 原始       | 3.69 MB     | 80%  |
+| **合计** |                    | **4.61 MB** |      |
 
 5000 帧 = 23 GB，2 万帧 = 92 GB。pointmap 占 80%，是主要矛盾。
 
@@ -37,18 +37,18 @@ IK 逆解 / Web 录制产生的数据集体积过大，训练时 CPU 与内存�
 才真正可控。pointmap 是平滑几何场，且 SigLIP 内部会 resize 到 512×512，半
 分辨率无损。
 
-| 特征            | 存储方式       | dtype      | 分辨率      | 每帧磁盘 | 每帧内存(Arrow) |
-|-----------------|---------------|------------|-------------|----------|-----------------|
-| RGB top         | mp4 视频编码   | `"video"`  | 480×640     | ~0.03 MB | ~0（不入表）    |
-| pointmap        | parquet 原始   | `"float16"`| **240×320** | ~0.18 MB | **0.73 MB**     |
+| 特征     | 存储方式     | dtype       | 分辨率      | 每帧磁盘 | 每帧内存(Arrow) |
+| -------- | ------------ | ----------- | ----------- | -------- | --------------- |
+| RGB top  | mp4 视频编码 | `"video"`   | 480×640     | ~0.03 MB | ~0（不入表）    |
+| pointmap | parquet 原始 | `"float16"` | **240×320** | ~0.18 MB | **0.73 MB**     |
 
 ### 实测压缩效果（64 帧基准）
 
-| 版本                          | 磁盘    | pointmap Arrow 内存 | 5000 帧外推 |
-|-------------------------------|---------|---------------------|-------------|
-| v1 原始（image+float32 全分辨率）| 36 MB   | 307 MB（4.8 MB/帧） | **23.4 GB** |
-| v2 video+float16 全分辨率       | 17 MB   | 187 MB（2.9 MB/帧） | 14.3 GB     |
-| **v3 video+float16+降采样**     | **4.7 MB** | **47 MB（0.73 MB/帧）** | **3.6 GB** |
+| 版本                              | 磁盘       | pointmap Arrow 内存     | 5000 帧外推 |
+| --------------------------------- | ---------- | ----------------------- | ----------- |
+| v1 原始（image+float32 全分辨率） | 36 MB      | 307 MB（4.8 MB/帧）     | **23.4 GB** |
+| v2 video+float16 全分辨率         | 17 MB      | 187 MB（2.9 MB/帧）     | 14.3 GB     |
+| **v3 video+float16+降采样**       | **4.7 MB** | **47 MB（0.73 MB/帧）** | **3.6 GB**  |
 
 - 磁盘压缩：**7.7×**（36M → 4.7M）
 - 内存压缩：**6.5×**（23.4GB → 3.6GB @ 5000帧）
@@ -58,10 +58,10 @@ IK 逆解 / Web 录制产生的数据集体积过大，训练时 CPU 与内存�
 
 ### 改动的文件
 
-| 文件                    | 改动                                                                 |
-|-------------------------|----------------------------------------------------------------------|
-| `data_gen/scripted.py`  | RGB dtype `"image"`→`"video"`；pointmap dtype `"float32"`→`"float16"`；pointmap shape `(480,640,3)`→`POINTMAP_STORE_SHAPE=(240,320,3)`；新增 `_downsample_pointmap()`；`add_frame()` 降采样+float16；`LeRobotDataset.create` `use_videos=False`→`True` |
-| `data_gen/reach_ik.py`  | `LeRobotDataset.create` `use_videos=False`→`True`（features/add_frame 复用 scripted） |
+| 文件                   | 改动                                                                                                                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data_gen/scripted.py` | RGB dtype `"image"`→`"video"`；pointmap dtype `"float32"`→`"float16"`；pointmap shape `(480,640,3)`→`POINTMAP_STORE_SHAPE=(240,320,3)`；新增 `_downsample_pointmap()`；`add_frame()` 降采样+float16；`LeRobotDataset.create` `use_videos=False`→`True` |
+| `data_gen/reach_ik.py` | `LeRobotDataset.create` `use_videos=False`→`True`（features/add_frame 复用 scripted）                                                                                                                                                                  |
 
 ### 关键约束（实测确认）
 

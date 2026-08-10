@@ -24,6 +24,7 @@
 ### Task 1: Constants + MJCF table_place
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/gym_unoarm/constants.py`
 - Create: `custom_envs/unoarm/gym_unoarm/table_place_scene.py`
 - Create/generate: `custom_envs/unoarm/gym_unoarm/mujoco_unoarm_table_place.xml` (via ensure helper)
@@ -39,6 +40,7 @@
 ### Task 2: Env support for table_place
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/gym_unoarm/env.py`
 - Create/Modify: `custom_envs/unoarm/tests/test_table_place_env.py`
 
@@ -54,6 +56,7 @@
 ### Task 3: Runner + settings + Web UI
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/webapp/runner.py`, `settings_store.py`, `app.py` (if needed)
 - Modify: `custom_envs/unoarm/static/web/index.html`, settings JS, `scene.js`, `main.js`/`reach_ik.js` hints
 

@@ -52,6 +52,4 @@ class ModeController:
     def require_mode(self, *allowed: AppMode) -> None:
         if self._mode not in allowed:
             names = ", ".join(m.value for m in allowed)
-            raise ModeError(
-                f"Operation not allowed in mode {self._mode.value!r}; requires one of: {names}"
-            )
+            raise ModeError(f"Operation not allowed in mode {self._mode.value!r}; requires one of: {names}")

@@ -23,31 +23,33 @@
 
 ## File map
 
-| File | Responsibility |
-|------|----------------|
-| `custom_envs/unoarm/gym_unoarm/ik.py` | DLS IK for right arm TCP pose |
-| `custom_envs/unoarm/data_gen/reach_ik.py` | Targets, sword placement, keyframes, dataset gen |
-| `custom_envs/unoarm/scripts/10_generate_reach_ik_data.py` | CLI |
-| `custom_envs/unoarm/tests/test_ik.py` | IK unit tests |
-| `custom_envs/unoarm/tests/test_reach_ik_datagen.py` | Loader/sampler + smoke gen |
-| `custom_envs/unoarm/data/targets_reach_ik_example.json` | Example targets file |
+| File                                                      | Responsibility                                   |
+| --------------------------------------------------------- | ------------------------------------------------ |
+| `custom_envs/unoarm/gym_unoarm/ik.py`                     | DLS IK for right arm TCP pose                    |
+| `custom_envs/unoarm/data_gen/reach_ik.py`                 | Targets, sword placement, keyframes, dataset gen |
+| `custom_envs/unoarm/scripts/10_generate_reach_ik_data.py` | CLI                                              |
+| `custom_envs/unoarm/tests/test_ik.py`                     | IK unit tests                                    |
+| `custom_envs/unoarm/tests/test_reach_ik_datagen.py`       | Loader/sampler + smoke gen                       |
+| `custom_envs/unoarm/data/targets_reach_ik_example.json`   | Example targets file                             |
 
 ---
 
 ### Task 1: Right-arm MuJoCo DLS IK
 
 **Files:**
+
 - Create: `custom_envs/unoarm/gym_unoarm/ik.py`
 - Test: `custom_envs/unoarm/tests/test_ik.py`
 
 **Interfaces:**
+
 - Consumes: `UnoarmEnv` with `scene=reach_sword`; sites `right_tcp`; joints `Right_Joint1`…`Right_Joint7`
 - Produces:
   - `FIXED_APPROACH_ROT_MAT: np.ndarray` shape `(3, 3)` — columns are TCP axes in world; +X along gripper (site), facing workspace (−Y world forward for approach)
-  - `solve_right_tcp_ik(env, target_pos, *, target_rot=None, max_iters=200, pos_tol=0.008, ori_tol=0.08, damping=1e-2) -> np.ndarray | None`  
+  - `solve_right_tcp_ik(env, target_pos, *, target_rot=None, max_iters=200, pos_tol=0.008, ori_tol=0.08, damping=1e-2) -> np.ndarray | None`
     Returns raw **16-D** `CONTROL_JOINTS` qpos on success (left arm unchanged from current), else `None`. Does not change gripper values except leaving them as-is from current qpos.
 
-**Orientation convention (lock in code + docstring):**  
+**Orientation convention (lock in code + docstring):**
 Build `FIXED_APPROACH_ROT_MAT` so TCP +X (gripper axis, matching `RIGHT_TCP_LOCAL`) points roughly **−Y** (into workspace), +Z roughly **+Z** (up). Use orthonormalization (`np.linalg.qr` or cross products).
 
 - [ ] **Step 1: Write failing tests**
@@ -217,17 +219,19 @@ Expected: 3 passed
 ### Task 2: Target load / sample + sword placement helpers
 
 **Files:**
+
 - Create: `custom_envs/unoarm/data_gen/reach_ik.py` (helpers first; generation in Task 3)
 - Create: `custom_envs/unoarm/data/targets_reach_ik_example.json`
 - Test: `custom_envs/unoarm/tests/test_reach_ik_datagen.py`
 
 **Interfaces:**
+
 - Produces:
   - `DEFAULT_TASK = "Reach the sword handle then pass the execution point"`
-  - `load_targets_json(path: Path) -> tuple[str, list[np.ndarray], np.ndarray]`  
+  - `load_targets_json(path: Path) -> tuple[str, list[np.ndarray], np.ndarray]`
     → `(task, list of xyz (3,), execution_point_pos (3,))`
   - `sample_targets_in_bbox(bbox_min, bbox_max, n, rng) -> list[np.ndarray]`
-  - `place_sword_handle(env, handle_xyz, euler_deg=(0,0,0)) -> None`  
+  - `place_sword_handle(env, handle_xyz, euler_deg=(0,0,0)) -> None`
     Uses `resolve_sword_pose`; sets `body_pos/quat` and `_sword_home_*`
 
 - [ ] **Step 1: Write failing tests**
@@ -286,9 +290,9 @@ Example JSON:
   "task": "Reach the sword handle then pass the execution point",
   "execution_point_pos": [-0.15, -0.35, 1.15],
   "targets": [
-    {"xyz": [-0.35, -0.55, 1.00]},
-    {"xyz": [-0.30, -0.50, 1.05]},
-    {"xyz": [-0.25, -0.55, 1.02]}
+    { "xyz": [-0.35, -0.55, 1.0] },
+    { "xyz": [-0.3, -0.5, 1.05] },
+    { "xyz": [-0.25, -0.55, 1.02] }
   ]
 }
 ```
@@ -316,30 +320,33 @@ def place_sword_handle(env, handle_xyz, euler_deg=(0.0, 0.0, 0.0)) -> None:
 ### Task 3: Keyframe build + dataset generation loop
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/data_gen/reach_ik.py`
 - Test: `custom_envs/unoarm/tests/test_reach_ik_datagen.py`
 
 **Interfaces:**
+
 - Consumes: Task 1 IK; Task 2 helpers; `data_gen.scripted` (`dataset_features`, `add_frame`, `build_episode_actions`, `clip_raw_pose`, `images_are_black`, `RAW_ZERO`)
 - Produces:
-  - `@dataclass ReachIkGenConfig` with fields:  
-    `targets_json: Path | None`, `bbox_min/max: tuple[float,float,float] | None`, `num_targets: int`,  
-    `episodes_per_target: int = 1`, `segment_steps: int = 20`, `hold_steps: int = 2`,  
-    `pose_jitter_std: float = 0.0`, `seed: int = 0`, `output_root: Path | None`,  
-    `repo_id: str = "doki/unoarm_reach_ik"`, `overwrite: bool = False`,  
-    `execution_point_pos: tuple[float,float,float] | None = None`,  
+  - `@dataclass ReachIkGenConfig` with fields:
+    `targets_json: Path | None`, `bbox_min/max: tuple[float,float,float] | None`, `num_targets: int`,
+    `episodes_per_target: int = 1`, `segment_steps: int = 20`, `hold_steps: int = 2`,
+    `pose_jitter_std: float = 0.0`, `seed: int = 0`, `output_root: Path | None`,
+    `repo_id: str = "doki/unoarm_reach_ik"`, `overwrite: bool = False`,
+    `execution_point_pos: tuple[float,float,float] | None = None`,
     `approach_offset_m: float = 0.06`, `ik_retries: int = 8`
-  - `build_reach_ik_poses(env, handle_xyz, execution_point_pos, approach_offset_m=0.06) -> list[np.ndarray] | None`  
-    Keyframes (raw 16-D): home → approach (open) → grasp (open) → grasp (closed) → exec (closed) → hold uses scripted holds  
-  - `generate_reach_ik_dataset(cfg, *, log=print) -> Path`  
+  - `build_reach_ik_poses(env, handle_xyz, execution_point_pos, approach_offset_m=0.06) -> list[np.ndarray] | None`
+    Keyframes (raw 16-D): home → approach (open) → grasp (open) → grasp (closed) → exec (closed) → hold uses scripted holds
+  - `generate_reach_ik_dataset(cfg, *, log=print) -> Path`
     Returns output root; raises `RuntimeError` if zero episodes written
 
 **Keyframe details:**
+
 1. Reset/home: `RAW_ZERO` (grippers open at +raw corresponding to open — use env limits; set right gripper to **high/open** raw via denormalize of `GRIPPER_OPEN` or clip open)
 2. Approach TCP = `handle + (0, +approach_offset_m, 0)`; IK; force right gripper open (normalized → raw)
 3. Grasp TCP = `handle`; IK; gripper open
 4. Same arm joints; right gripper **closed** (normalized `GRIPPER_CLOSE`)
-5. Exec TCP = `execution_point_pos`; IK from current (attached) state; gripper closed  
+5. Exec TCP = `execution_point_pos`; IK from current (attached) state; gripper closed
 6. Pass list to `build_episode_actions` **without** re-wrapping `build_pose_sequence` zero bookends if home already first — either include home as first pose and skip duplicate zeros, or call `build_episode_actions` on `[approach, grasp_open, grasp_close, exec]` after starting from reset zero. Prefer: poses = `[approach_open, grasp_open, grasp_close, exec_close]` and let `build_episode_actions` prepend holds from `RAW_ZERO` as it already does.
 
 Gripper open/close helpers:
@@ -426,10 +433,12 @@ uv run pytest tests/test_reach_ik_datagen.py -svv
 ### Task 4: CLI `10_generate_reach_ik_data.py`
 
 **Files:**
+
 - Create: `custom_envs/unoarm/scripts/10_generate_reach_ik_data.py`
 - Modify: `custom_envs/unoarm/README.md` — short section under data generation pointing to the new script and example JSON
 
 **Interfaces:**
+
 - Consumes: `ReachIkGenConfig`, `generate_reach_ik_dataset`
 - CLI flags matching spec: `--targets-json` XOR (`--bbox-min` 3 floats + `--bbox-max` 3 floats + `--num-targets`); `--episodes-per-target`; `--segment-steps`; `--hold-steps`; `--pose-jitter-std` default 0; `--seed`; `--output-root`; `--repo-id`; `--overwrite`; `--execution-point` optional 3 floats; `--approach-offset`
 
@@ -465,17 +474,17 @@ Expected: log lines `saved episode…`, `dataset finalized…`, non-zero exit on
 
 ## Spec coverage check
 
-| Spec item | Task |
-|-----------|------|
-| JSON targets + bbox sampling | 2, 4 |
-| MuJoCo DLS IK + fixed orientation + 6 cm +Y approach | 1, 3 |
-| Approach → grasp → execution point | 3 |
-| Right arm only / remove shield | 3 |
-| Reuse dataset features / add_frame | 3 |
-| Skip failed IK; fail if zero episodes | 3 |
-| CLI entry | 4 |
-| Tests | 1–3 |
-| No change to scripted `06` path | (untouched) |
+| Spec item                                            | Task        |
+| ---------------------------------------------------- | ----------- |
+| JSON targets + bbox sampling                         | 2, 4        |
+| MuJoCo DLS IK + fixed orientation + 6 cm +Y approach | 1, 3        |
+| Approach → grasp → execution point                   | 3           |
+| Right arm only / remove shield                       | 3           |
+| Reuse dataset features / add_frame                   | 3           |
+| Skip failed IK; fail if zero episodes                | 3           |
+| CLI entry                                            | 4           |
+| Tests                                                | 1–3         |
+| No change to scripted `06` path                      | (untouched) |
 
 ## Placeholder scan
 
@@ -489,7 +498,7 @@ Plan complete and saved to `docs/superpowers/plans/2026-07-27-unoarm-reach-ik-da
 
 **Two execution options:**
 
-1. **Subagent-Driven (recommended)** — fresh subagent per task, review between tasks  
-2. **Inline Execution** — implement in this session task-by-task with checkpoints  
+1. **Subagent-Driven (recommended)** — fresh subagent per task, review between tasks
+2. **Inline Execution** — implement in this session task-by-task with checkpoints
 
 Which approach?

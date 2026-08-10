@@ -22,7 +22,7 @@ from gym_unoarm.constants import CONTROL_JOINTS  # noqa: E402
 
 
 def _pose_dict(values: dict[str, float] | None = None) -> dict[str, float]:
-    base = {name: 0.0 for name in CONTROL_JOINTS}
+    base = dict.fromkeys(CONTROL_JOINTS, 0.0)
     if values:
         base.update(values)
     return base
@@ -142,9 +142,5 @@ def test_pose_jitter_varies_episodes_without_frame_shake() -> None:
 
     deltas = np.diff(a0, axis=0)
     sign = np.sign(deltas)
-    flips = (
-        (sign[1:] * sign[:-1] < 0)
-        & (np.abs(deltas[1:]) > 1e-4)
-        & (np.abs(deltas[:-1]) > 1e-4)
-    )
+    flips = (sign[1:] * sign[:-1] < 0) & (np.abs(deltas[1:]) > 1e-4) & (np.abs(deltas[:-1]) > 1e-4)
     assert int(flips.sum()) == 0

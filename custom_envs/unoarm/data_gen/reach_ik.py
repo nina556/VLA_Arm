@@ -17,7 +17,6 @@ from typing import Any
 
 import mujoco
 import numpy as np
-
 from gym_unoarm.constants import (
     FPS,
     GRIPPER_CLOSE,
@@ -83,10 +82,7 @@ def load_targets_json(path: Path) -> tuple[str, list[np.ndarray]]:
         raise ValueError("'targets' must be a non-empty list")
     targets: list[np.ndarray] = []
     for i, item in enumerate(raw_targets):
-        if isinstance(item, dict):
-            xyz = item.get("xyz")
-        else:
-            xyz = item
+        xyz = item.get("xyz") if isinstance(item, dict) else item
         try:
             vec = np.asarray([float(x) for x in xyz], dtype=np.float64).reshape(3)
         except (TypeError, ValueError) as exc:
@@ -245,6 +241,7 @@ def generate_reach_ik_dataset(config: ReachIkGenConfig, *, log: LogFn = print) -
         shutil.rmtree(output_root)
 
     from gym_unoarm.env import UnoarmEnv
+
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     dataset = LeRobotDataset.create(
@@ -353,8 +350,10 @@ def generate_reach_ik_dataset(config: ReachIkGenConfig, *, log: LogFn = print) -
                 poses, home_q = try_solve(handle)
                 if poses is None or home_q is None:
                     skipped += 1
-                    log(f"skip draw {draw_i}: IK failed handle={handle.tolist()} "
-                        f"(success {success_targets}/{goal})")
+                    log(
+                        f"skip draw {draw_i}: IK failed handle={handle.tolist()} "
+                        f"(success {success_targets}/{goal})"
+                    )
                     continue
                 write_target(success_targets, handle, poses, home_q)
                 success_targets += 1
@@ -387,9 +386,7 @@ def generate_reach_ik_dataset(config: ReachIkGenConfig, *, log: LogFn = print) -
                 "skipped_targets": int(skipped),
             }
             meta_path = output_root / REACH_IK_META_NAME
-            meta_path.write_text(
-                json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-            )
+            meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
             log(f"wrote {meta_path.name}")
         log(
             f"dataset finalized at {output_root} written={written} "
@@ -505,7 +502,5 @@ def dataset_episode_count(root: Path, repo_id: str | None = None) -> int:
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     rid = repo_id or f"local/{Path(root).name}"
-    ds = LeRobotDataset(
-        rid, root=Path(root), download_videos=False, video_backend="pyav"
-    )
+    ds = LeRobotDataset(rid, root=Path(root), download_videos=False, video_backend="pyav")
     return int(getattr(ds.meta, "total_episodes", 0) or 0)

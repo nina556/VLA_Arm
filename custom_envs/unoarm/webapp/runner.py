@@ -27,6 +27,22 @@ if str(ROOT) not in sys.path:
 if str(REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
+from data_gen.reach_ik import (  # noqa: E402
+    DATA_ROOT as UNOARM_DATA_ROOT,
+    ReachIkGenConfig,
+    dataset_episode_count,
+    generate_reach_ik_dataset,
+    list_reach_ik_datasets,
+    load_reach_ik_meta,
+    place_sword_handle,
+)
+from data_gen.scripted import ScriptedGenConfig, generate_scripted_dataset  # noqa: E402
+from data_gen.table_place_ik import (  # noqa: E402
+    episode_peg_xy_from_meta,
+    generate_table_place_ik_dataset,
+    load_table_place_ik_meta,
+    table_place_ik_config_from_params,
+)
 from gym_unoarm.constants import (  # noqa: E402
     CAMERAS,
     CONTROL_JOINTS,
@@ -70,7 +86,6 @@ from gym_unoarm.sword_pose import (  # noqa: E402
     resolve_shield_pose,
     resolve_sword_pose,
 )
-from pose_design.export import to_poses_payload  # noqa: E402
 from pose_design.models import (  # noqa: E402
     DesignProject,
     normalize_pose_dict,
@@ -81,32 +96,16 @@ from pose_design.models import (  # noqa: E402
 )
 from pose_design.preview import build_preview_trajectory  # noqa: E402
 from pose_design.store import DesignStore  # noqa: E402
-from data_gen.scripted import ScriptedGenConfig, generate_scripted_dataset  # noqa: E402
-from data_gen.reach_ik import (  # noqa: E402
-    DATA_ROOT as UNOARM_DATA_ROOT,
-    ReachIkGenConfig,
-    dataset_episode_count,
-    generate_reach_ik_dataset,
-    list_reach_ik_datasets,
-    load_reach_ik_meta,
-    place_sword_handle,
-)
-from data_gen.table_place_ik import (  # noqa: E402
-    episode_peg_xy_from_meta,
-    generate_table_place_ik_dataset,
-    load_table_place_ik_meta,
-    table_place_ik_config_from_params,
-)
-from webapp.modes import AppMode, ModeController, ModeError  # noqa: E402
-from webapp.vla_bridge_client import BridgeConfig, VlaBridgeClient  # noqa: E402
+
 from webapp.llm_router import ActionDecision, ChatRouter  # noqa: E402
+from webapp.modes import AppMode, ModeController, ModeError  # noqa: E402
 from webapp.settings_store import (  # noqa: E402
     DEFAULT_SETTINGS_PATH,
-    load_settings,
     merge_settings_patch,
     public_settings,
     save_settings,
 )
+from webapp.vla_bridge_client import BridgeConfig, VlaBridgeClient  # noqa: E402
 
 
 def load_interact_module():
@@ -138,7 +137,7 @@ DEFAULT_VLM_MODEL = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
 
 @dataclass
 class WebConfig:
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # nosec B104 - web console is intentionally reachable from WSL host
     port: int = 7860
     checkpoint: Path | None = None
     max_steps: int = 150
@@ -209,7 +208,7 @@ class WebConfig:
 def webconfig_from_settings(
     settings: dict[str, Any],
     *,
-    host: str = "0.0.0.0",
+    host: str = "0.0.0.0",  # nosec B104 - web console is intentionally reachable from WSL host
     port: int = 7860,
     settings_path: Path | None = None,
 ) -> WebConfig:
@@ -230,14 +229,10 @@ def webconfig_from_settings(
     )
     if len(shield_handle) != 3:
         shield_handle = tuple(default_shield_handle_pos())
-    shield_euler = tuple(
-        float(x) for x in (settings.get("shield_euler_deg") or default_shield_euler_deg())
-    )
+    shield_euler = tuple(float(x) for x in (settings.get("shield_euler_deg") or default_shield_euler_deg()))
     if len(shield_euler) != 3:
         shield_euler = tuple(default_shield_euler_deg())
-    exec_pos = tuple(
-        float(x) for x in (settings.get("execution_point_pos") or DEFAULT_EXECUTION_POINT_POS)
-    )
+    exec_pos = tuple(float(x) for x in (settings.get("execution_point_pos") or DEFAULT_EXECUTION_POINT_POS))
     if len(exec_pos) != 3:
         exec_pos = tuple(DEFAULT_EXECUTION_POINT_POS)
     return WebConfig(
@@ -471,13 +466,9 @@ class UnoarmWebRunner:
         if self.cfg.scene == SCENE_REACH_SWORD:
             body_pos, body_quat, handle = self.cfg.resolved_sword_pose()
             shield_pos, shield_quat, shield_handle = self.cfg.resolved_shield_pose()
+            self._log(f"sword handle={handle} euler_deg={self.cfg.sword_euler_deg} body_pos={body_pos}")
             self._log(
-                f"sword handle={handle} euler_deg={self.cfg.sword_euler_deg} "
-                f"body_pos={body_pos}"
-            )
-            self._log(
-                f"shield handle={shield_handle} euler_deg={self.cfg.shield_euler_deg} "
-                f"body_pos={shield_pos}"
+                f"shield handle={shield_handle} euler_deg={self.cfg.shield_euler_deg} body_pos={shield_pos}"
             )
         self.env = UnoarmEnv(
             obs_type="pixels_agent_pos",
@@ -515,11 +506,7 @@ class UnoarmWebRunner:
 
     def _build_router(self) -> None:
         """(Re)create the LLM intent router from current settings."""
-        api_key = (
-            self.cfg.api_key
-            or os.environ.get(self.cfg.api_key_env)
-            or ""
-        ).strip()
+        api_key = (self.cfg.api_key or os.environ.get(self.cfg.api_key_env) or "").strip()
         try:
             self.router = ChatRouter(
                 model=self.cfg.llm_model,
@@ -553,15 +540,11 @@ class UnoarmWebRunner:
             return
         try:
             self.device = torch.device(
-                self.cfg.device
-                if self.cfg.device
-                else ("cuda" if torch.cuda.is_available() else "cpu")
+                self.cfg.device if self.cfg.device else ("cuda" if torch.cuda.is_available() else "cpu")
             )
             self._log(f"loading policy from {ckpt} on {self.device}")
             policy_config = PreTrainedConfig.from_pretrained(ckpt)
-            policy_type = getattr(policy_config, "type", None) or getattr(
-                policy_config, "name", ""
-            ).lower()
+            policy_type = getattr(policy_config, "type", None) or getattr(policy_config, "name", "").lower()
             policy_cls = _POLICY_REGISTRY.get(policy_type)
             if policy_cls is None:
                 raise ValueError(
@@ -662,17 +645,14 @@ class UnoarmWebRunner:
             old_remove_shield = bool(current.get("remove_shield", False))
             old_enable_exec = bool(current.get("enable_execution_point", False))
             old_exec_pos = tuple(
-                float(x)
-                for x in (current.get("execution_point_pos") or DEFAULT_EXECUTION_POINT_POS)
+                float(x) for x in (current.get("execution_point_pos") or DEFAULT_EXECUTION_POINT_POS)
             )
             old_dw = int(current.get("display_width", 1280))
             old_dh = int(current.get("display_height", 720))
             old_handle = tuple(
                 float(x) for x in (current.get("sword_handle_pos") or default_sword_handle_pos())
             )
-            old_euler = tuple(
-                float(x) for x in (current.get("sword_euler_deg") or default_sword_euler_deg())
-            )
+            old_euler = tuple(float(x) for x in (current.get("sword_euler_deg") or default_sword_euler_deg()))
             old_shield_handle = tuple(
                 float(x) for x in (current.get("shield_handle_pos") or default_shield_handle_pos())
             )
@@ -690,18 +670,17 @@ class UnoarmWebRunner:
             self.cfg = new_cfg
             self.store = DesignStore(self.cfg.designs_dir)
 
-            pose_changed = any(
-                abs(a - b) > 1e-9
-                for a, b in zip(old_handle, self.cfg.sword_handle_pos, strict=True)
-            ) or any(
-                abs(a - b) > 1e-9
-                for a, b in zip(old_euler, self.cfg.sword_euler_deg, strict=True)
-            ) or any(
-                abs(a - b) > 1e-9
-                for a, b in zip(old_shield_handle, self.cfg.shield_handle_pos, strict=True)
-            ) or any(
-                abs(a - b) > 1e-9
-                for a, b in zip(old_shield_euler, self.cfg.shield_euler_deg, strict=True)
+            pose_changed = (
+                any(abs(a - b) > 1e-9 for a, b in zip(old_handle, self.cfg.sword_handle_pos, strict=True))
+                or any(abs(a - b) > 1e-9 for a, b in zip(old_euler, self.cfg.sword_euler_deg, strict=True))
+                or any(
+                    abs(a - b) > 1e-9
+                    for a, b in zip(old_shield_handle, self.cfg.shield_handle_pos, strict=True)
+                )
+                or any(
+                    abs(a - b) > 1e-9
+                    for a, b in zip(old_shield_euler, self.cfg.shield_euler_deg, strict=True)
+                )
             )
             rebuilt_env = False
             if (
@@ -716,27 +695,20 @@ class UnoarmWebRunner:
                 self._build_env()
                 self.obs, _ = self.env.reset()
                 rebuilt_env = True
-            elif (
-                old_remove_sword != self.cfg.remove_sword
-                or old_remove_shield != self.cfg.remove_shield
-            ):
+            elif old_remove_sword != self.cfg.remove_sword or old_remove_shield != self.cfg.remove_shield:
                 self.env.set_prop_removed(
                     remove_sword=self.cfg.remove_sword,
                     remove_shield=self.cfg.remove_shield,
                 )
                 self.obs = self.env._get_obs()
                 self._log(
-                    f"props: remove_sword={self.cfg.remove_sword} "
-                    f"remove_shield={self.cfg.remove_shield}"
+                    f"props: remove_sword={self.cfg.remove_sword} remove_shield={self.cfg.remove_shield}"
                 )
 
             exec_pos_changed = any(
-                abs(a - b) > 1e-9
-                for a, b in zip(old_exec_pos, self.cfg.execution_point_pos, strict=True)
+                abs(a - b) > 1e-9 for a, b in zip(old_exec_pos, self.cfg.execution_point_pos, strict=True)
             )
-            if not rebuilt_env and (
-                old_enable_exec != self.cfg.enable_execution_point or exec_pos_changed
-            ):
+            if not rebuilt_env and (old_enable_exec != self.cfg.enable_execution_point or exec_pos_changed):
                 self.env.set_execution_point(
                     enable=self.cfg.enable_execution_point,
                     position=self.cfg.execution_point_pos,
@@ -993,9 +965,7 @@ class UnoarmWebRunner:
             # Match offline eval / default env reset: normalized START_POSE (all
             # zeros). Do NOT use normalize(raw zeros) — that is a different pose
             # and leaves ACT nearly frozen.
-            self.obs, _info = self.env.reset(
-                options={"state": np.asarray(START_POSE, dtype=np.float32)}
-            )
+            self.obs, _info = self.env.reset(options={"state": np.asarray(START_POSE, dtype=np.float32)})
             self.step = 0
             self.current_task = ""
             self.status = "idle"
@@ -1060,9 +1030,7 @@ class UnoarmWebRunner:
                 "input_locked": self.status == "routing" or self.modes.mode != AppMode.CHAT,
                 "logs": list(self.logs),
                 # Obs cameras = same MuJoCo views as training/inference pixels.
-                "cameras": (
-                    self._render_obs_cameras_b64_locked() if self.obs_preview_enabled else {}
-                ),
+                "cameras": (self._render_obs_cameras_b64_locked() if self.obs_preview_enabled else {}),
                 "obs_preview": bool(self.obs_preview_enabled),
                 "frame": "",
                 "joint_state": joint_state,
@@ -1114,9 +1082,7 @@ class UnoarmWebRunner:
             body_pos, body_quat, handle = self.cfg.resolved_sword_pose()
 
         # Prefer live MuJoCo body so Three.js follows kinematic attach/carry.
-        right_attached = bool(getattr(self.env, "_sword_attached", False)) and not bool(
-            self.cfg.remove_sword
-        )
+        right_attached = bool(getattr(self.env, "_sword_attached", False)) and not bool(self.cfg.remove_sword)
         left_attached = bool(getattr(self.env, "_shield_attached", False)) and not bool(
             self.cfg.remove_shield
         )
@@ -1131,9 +1097,7 @@ class UnoarmWebRunner:
             handle = tuple(float(x) for x in self.env.data.site_xpos[handle_id])
 
         shield_pos = tuple(float(x) for x in self.env.model.body_pos[shield_id]) if shield_id >= 0 else None
-        shield_quat = (
-            tuple(float(x) for x in self.env.model.body_quat[shield_id]) if shield_id >= 0 else None
-        )
+        shield_quat = tuple(float(x) for x in self.env.model.body_quat[shield_id]) if shield_id >= 0 else None
         shield_handle = (
             tuple(float(x) for x in self.env.data.site_xpos[shield_handle_id])
             if shield_handle_id >= 0
@@ -1168,9 +1132,7 @@ class UnoarmWebRunner:
                 "present": not bool(self.cfg.remove_shield),
                 "scale": float(HELMET_MESH_SCALE),
                 "position": list(shield_pos) if shield_pos is not None else list(HELMET_BODY_POS),
-                "quaternion_wxyz": list(shield_quat)
-                if shield_quat is not None
-                else list(HELMET_BODY_QUAT),
+                "quaternion_wxyz": list(shield_quat) if shield_quat is not None else list(HELMET_BODY_QUAT),
                 "handle_local": list(HELMET_HANDLE_LOCAL),
                 "handle_world": list(shield_handle) if shield_handle is not None else None,
                 "color": int(HELMET_THREE_COLOR),
@@ -1187,7 +1149,7 @@ class UnoarmWebRunner:
                 ),
                 "position": list(self.cfg.execution_point_pos),
                 "passed": bool(getattr(self.env, "_execution_point_passed", False)),
-                "color": 0x2ecc71,
+                "color": 0x2ECC71,
             },
         }
 
@@ -1202,14 +1164,10 @@ class UnoarmWebRunner:
             else tuple(float(x) for x in TABLE_PLACE_POS)
         )
         peg_quat = (
-            tuple(float(x) for x in self.env.model.body_quat[peg_id])
-            if peg_id >= 0
-            else (1.0, 0.0, 0.0, 0.0)
+            tuple(float(x) for x in self.env.model.body_quat[peg_id]) if peg_id >= 0 else (1.0, 0.0, 0.0, 0.0)
         )
         grasp_world = (
-            tuple(float(x) for x in self.env.data.site_xpos[grasp_id])
-            if grasp_id >= 0
-            else list(peg_pos)
+            tuple(float(x) for x in self.env.data.site_xpos[grasp_id]) if grasp_id >= 0 else list(peg_pos)
         )
         circle_pos = (
             tuple(float(x) for x in self.env.data.site_xpos[circle_id])
@@ -1455,7 +1413,12 @@ class UnoarmWebRunner:
         self.modes.require_mode(AppMode.CHAT)
         if self.is_validating:
             raise RuntimeError("验证进行中，请先停止验证。")
-        if not self.policy_ready or self.policy is None or self.preprocess is None or self.postprocess is None:
+        if (
+            not self.policy_ready
+            or self.policy is None
+            or self.preprocess is None
+            or self.postprocess is None
+        ):
             raise RuntimeError(self.policy_error or "策略未加载，请先在设置中配置 checkpoint。")
         if self.is_running:
             raise RuntimeError("Rollout is already running.")
@@ -1464,17 +1427,13 @@ class UnoarmWebRunner:
             self.status = "running"
             self.current_task = task
             self.step = 0
-            reset_opts: dict[str, Any] = {
-                "state": np.asarray(START_POSE, dtype=np.float32)
-            }
+            reset_opts: dict[str, Any] = {"state": np.asarray(START_POSE, dtype=np.float32)}
             # Match offline eval: randomize peg XY each rollout. The fixed
             # default peg sits in a hard-to-grasp pocket where ACT often fails.
             if self.cfg.scene == SCENE_TABLE_PLACE:
                 peg_xy = sample_peg_xy(np.random.default_rng())
                 reset_opts["peg_xy"] = peg_xy
-                self._log(
-                    f"table_place peg_xy=[{peg_xy[0]:.3f},{peg_xy[1]:.3f}]"
-                )
+                self._log(f"table_place peg_xy=[{peg_xy[0]:.3f},{peg_xy[1]:.3f}]")
             self.obs, _info = self.env.reset(options=reset_opts)
             self._close_policy_renderer_locked()
             self.policy.reset()
@@ -1585,15 +1544,11 @@ class UnoarmWebRunner:
                 if self.cfg.scene == SCENE_REACH_SWORD:
                     try:
                         info = self.env._reach_info()
-                        reach_info = (
-                            f" success={info['success']} dist={info['reach_distance']:.4f}m"
-                        )
+                        reach_info = f" success={info['success']} dist={info['reach_distance']:.4f}m"
                     except Exception:
                         reach_info = ""
             self.stop_event.clear()
-            self._log(
-                ("rollout stopped" if stopped else "rollout complete") + reach_info
-            )
+            self._log(("rollout stopped" if stopped else "rollout complete") + reach_info)
 
     # ---- validate (post-training reach eval) ------------------------------
 
@@ -1663,7 +1618,7 @@ class UnoarmWebRunner:
             mujoco.mj_forward(self.env.model, self.env.data)
 
     def _clear_sword_override_locked(self) -> None:
-        """Backward-compatible alias: clear sword + shield eval overrides. """
+        """Backward-compatible alias: clear sword + shield eval overrides."""
         self._clear_eval_overrides_locked()
 
     def get_validate_status(self) -> dict[str, Any]:
@@ -1684,7 +1639,12 @@ class UnoarmWebRunner:
     ) -> dict[str, Any]:
         if self.cfg.scene != SCENE_REACH_SWORD:
             raise RuntimeError("验证抓取需要 scene=reach_sword。请在设置中切换场景。")
-        if not self.policy_ready or self.policy is None or self.preprocess is None or self.postprocess is None:
+        if (
+            not self.policy_ready
+            or self.policy is None
+            or self.preprocess is None
+            or self.postprocess is None
+        ):
             raise RuntimeError(self.policy_error or "策略未加载，请先在「设置」中配置 checkpoint 并保存。")
         if self.is_running:
             raise RuntimeError("对话执行中，请先 Stop。")
@@ -1698,11 +1658,7 @@ class UnoarmWebRunner:
         steps = int(max_steps) if max_steps is not None else int(self.cfg.max_steps)
         if steps < 1:
             raise ValueError("max_steps must be >= 1")
-        jitter = (
-            (0.15, 0.12, 0.08)
-            if handle_jitter is None
-            else tuple(float(x) for x in handle_jitter)
-        )
+        jitter = (0.15, 0.12, 0.08) if handle_jitter is None else tuple(float(x) for x in handle_jitter)
         if len(jitter) != 3 or any(x < 0 for x in jitter):
             raise ValueError("handle_jitter 需为非负三元组 [dx, dy, dz]")
         shield_jitter = (
@@ -1800,18 +1756,14 @@ class UnoarmWebRunner:
                 )
                 shield_handle = (base_shield_handle + shield_offset).tolist()
                 if randomize_shield_euler:
-                    shield_euler = (
-                        base_shield_euler + rng.uniform(-15.0, 15.0, size=3)
-                    ).tolist()
+                    shield_euler = (base_shield_euler + rng.uniform(-15.0, 15.0, size=3)).tolist()
                 else:
                     shield_euler = base_shield_euler.tolist()
 
                 with self.lock:
                     self.validate_status.episode = ep
                     self.validate_status.current_handle = [float(x) for x in handle]
-                    self.validate_status.current_shield_handle = [
-                        float(x) for x in shield_handle
-                    ]
+                    self.validate_status.current_shield_handle = [float(x) for x in shield_handle]
                     self.validate_status.message = f"episode {ep}/{episodes}"
                     self.current_task = f"validate {ep}/{episodes}"
                     self.step = 0
@@ -1844,9 +1796,9 @@ class UnoarmWebRunner:
                         with self.lock:
                             obs_snapshot = self._copy_obs()
                             if prev_action is None:
-                                prev_action = np.asarray(
-                                    obs_snapshot["agent_pos"], dtype=np.float32
-                                ).reshape(16)
+                                prev_action = np.asarray(obs_snapshot["agent_pos"], dtype=np.float32).reshape(
+                                    16
+                                )
 
                         frame = interact.obs_to_frame(obs_snapshot, self.device)
                         processed = self.preprocess(frame)
@@ -1893,10 +1845,8 @@ class UnoarmWebRunner:
                     self.validate_status.results.append(row)
                     if success:
                         self.validate_status.successes += 1
-                    self.validate_status.message = (
-                        f"ep {ep}/{episodes} "
-                        f"{'OK' if success else 'FAIL'}"
-                        + (f" dist={final_dist:.3f}m" if final_dist is not None else "")
+                    self.validate_status.message = f"ep {ep}/{episodes} {'OK' if success else 'FAIL'}" + (
+                        f" dist={final_dist:.3f}m" if final_dist is not None else ""
                     )
                 self._log(
                     f"validate ep {ep} -> {'success' if success else 'fail'}"
@@ -1971,10 +1921,7 @@ class UnoarmWebRunner:
 
     def set_pose(self, pose: list[float] | dict[str, float]) -> dict[str, Any]:
         self.modes.require_mode(AppMode.DESIGN)
-        if isinstance(pose, dict):
-            values = vector_from_pose_dict(pose)
-        else:
-            values = [float(v) for v in pose]
+        values = vector_from_pose_dict(pose) if isinstance(pose, dict) else [float(v) for v in pose]
         if len(values) != 16:
             raise ValueError(f"pose must have 16 values, got {len(values)}")
         raw = np.asarray(values, dtype=np.float32)
@@ -2009,7 +1956,9 @@ class UnoarmWebRunner:
             self.dirty = True
         return self.get_project()
 
-    def upsert_keyframe(self, name: str, pose: list[float] | dict[str, float] | None = None) -> dict[str, Any]:
+    def upsert_keyframe(
+        self, name: str, pose: list[float] | dict[str, float] | None = None
+    ) -> dict[str, Any]:
         self.modes.require_mode(AppMode.DESIGN)
         key = str(name).strip()
         if not key:
@@ -2165,8 +2114,8 @@ class UnoarmWebRunner:
         if not poses_path.exists():
             raise FileNotFoundError(f"poses file not found: {poses_path}. Save the design first.")
 
-        output_root = Path(params["output_root"]) if params.get("output_root") else (
-            ROOT / "data" / f"unoarm_{name}"
+        output_root = (
+            Path(params["output_root"]) if params.get("output_root") else (ROOT / "data" / f"unoarm_{name}")
         )
         cfg = ScriptedGenConfig(
             poses_json=poses_path,
@@ -2237,9 +2186,7 @@ class UnoarmWebRunner:
         mode = str(params.get("mode") or "json").strip().lower()
         scene = str(getattr(self.cfg, "scene", "") or "")
         default_out = (
-            "table_place_ik_web"
-            if (scene == SCENE_TABLE_PLACE or mode == "table_place")
-            else "reach_ik_web"
+            "table_place_ik_web" if (scene == SCENE_TABLE_PLACE or mode == "table_place") else "reach_ik_web"
         )
         output_name = slugify_name(str(params.get("output_name") or default_out))
         output_root = UNOARM_DATA_ROOT / f"unoarm_{output_name}"
@@ -2256,9 +2203,7 @@ class UnoarmWebRunner:
             self.reach_ik_gen_status = GenerateStatus(
                 state="running", message="starting table_place IK", logs=[]
             )
-            thread = threading.Thread(
-                target=self._table_place_ik_generate_loop, args=(tp_cfg,), daemon=True
-            )
+            thread = threading.Thread(target=self._table_place_ik_generate_loop, args=(tp_cfg,), daemon=True)
             self.reach_ik_gen_thread = thread
             thread.start()
             return {
@@ -2535,12 +2480,8 @@ class UnoarmWebRunner:
         try:
             dt = 1.0 / max(1e-6, float(FPS) * max(0.05, float(speed)))
             stopped = False
-            is_table_place = (
-                getattr(self.env, "scene", None) == SCENE_TABLE_PLACE
-                or (
-                    isinstance(meta, dict)
-                    and meta.get("mode") == "table_place_pick_place"
-                )
+            is_table_place = getattr(self.env, "scene", None) == SCENE_TABLE_PLACE or (
+                isinstance(meta, dict) and meta.get("mode") == "table_place_pick_place"
             )
             for ep_idx in range(int(start_episode), int(n_episodes)):
                 if self.reach_ik_replay_stop.is_set():
@@ -2548,9 +2489,7 @@ class UnoarmWebRunner:
                     break
 
                 handle = None if is_table_place else handle_for_episode(ep_idx)
-                peg_xy = (
-                    episode_peg_xy_from_meta(meta, ep_idx) if is_table_place else None
-                )
+                peg_xy = episode_peg_xy_from_meta(meta, ep_idx) if is_table_place else None
                 if is_table_place and peg_xy is None:
                     self._log(
                         f"table-place replay: episode {ep_idx} has no peg_xy in meta; "
@@ -2558,8 +2497,7 @@ class UnoarmWebRunner:
                     )
                 if not is_table_place and handle is None:
                     self._log(
-                        f"reach-ik replay: episode {ep_idx} has no handle in meta; "
-                        "keeping current sword pose"
+                        f"reach-ik replay: episode {ep_idx} has no handle in meta; keeping current sword pose"
                     )
 
                 # Action-only replay: read parquet via hf_dataset so we never
@@ -2581,9 +2519,7 @@ class UnoarmWebRunner:
                     self.reach_ik_replay_status.n_episodes = int(n_episodes)
                     self.reach_ik_replay_status.n_frames = int(n_frames)
                     self.reach_ik_replay_status.frame = 0
-                    self.reach_ik_replay_status.handle = (
-                        list(handle) if handle is not None else None
-                    )
+                    self.reach_ik_replay_status.handle = list(handle) if handle is not None else None
                     self.reach_ik_replay_status.peg_xy = (
                         [float(peg_xy[0]), float(peg_xy[1])] if peg_xy is not None else None
                     )

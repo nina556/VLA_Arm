@@ -17,9 +17,9 @@
 from __future__ import annotations
 
 import torch
+from kv_utils import flatten_past_key_values, sorted_kv_keys, unflatten_past_key_values
 from torch import Tensor, nn
 
-from kv_utils import flatten_past_key_values, sorted_kv_keys, unflatten_past_key_values
 from lerobot.policies.smolvla.modeling_smolvla import make_att_2d_masks
 
 
@@ -77,7 +77,7 @@ class DenoiseExportWrapper(nn.Module):
         prefix_pad_masks: Tensor,
         *kv_tensors: Tensor,
     ) -> Tensor:
-        flat = {name: tensor for name, tensor in zip(self.kv_keys, kv_tensors, strict=True)}
+        flat = dict(zip(self.kv_keys, kv_tensors, strict=True))
         past = unflatten_past_key_values(flat)
         return self.model.denoise_step(
             prefix_pad_masks=prefix_pad_masks,

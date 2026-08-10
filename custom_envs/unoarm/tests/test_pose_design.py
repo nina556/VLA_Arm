@@ -14,13 +14,18 @@ if str(ROOT) not in sys.path:
 from data_gen.scripted import load_poses_from_json  # noqa: E402
 from gym_unoarm.constants import CONTROL_JOINTS  # noqa: E402
 from pose_design.export import expand_playlist, to_poses_payload  # noqa: E402
-from pose_design.models import DesignProject, slugify_name, validate_project, validate_playlist_structure  # noqa: E402
+from pose_design.models import (  # noqa: E402
+    DesignProject,
+    slugify_name,
+    validate_playlist_structure,
+    validate_project,
+)
 from pose_design.preview import build_preview_trajectory  # noqa: E402
 from pose_design.store import DesignStore  # noqa: E402
 
 
 def _full_pose(**overrides: float) -> dict[str, float]:
-    pose = {name: 0.0 for name in CONTROL_JOINTS}
+    pose = dict.fromkeys(CONTROL_JOINTS, 0.0)
     pose.update(overrides)
     return pose
 

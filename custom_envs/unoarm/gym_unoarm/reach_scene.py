@@ -141,9 +141,7 @@ def ensure_reach_sword_xml(
 
     pos = tuple(float(x) for x in (body_pos if body_pos is not None else SWORD_BODY_POS))
     quat = tuple(float(x) for x in (body_quat if body_quat is not None else SWORD_BODY_QUAT))
-    handle = tuple(
-        float(x) for x in (handle_local if handle_local is not None else SWORD_HANDLE_LOCAL)
-    )
+    handle = tuple(float(x) for x in (handle_local if handle_local is not None else SWORD_HANDLE_LOCAL))
     scale = float(mesh_scale if mesh_scale is not None else SWORD_MESH_SCALE)
     color = tuple(float(x) for x in (rgba if rgba is not None else SWORD_RGBA))
 
@@ -151,21 +149,13 @@ def ensure_reach_sword_xml(
         float(x) for x in (shield_body_pos if shield_body_pos is not None else HELMET_BODY_POS)
     )
     shield_quat = tuple(
-        float(x)
-        for x in (shield_body_quat if shield_body_quat is not None else HELMET_BODY_QUAT)
+        float(x) for x in (shield_body_quat if shield_body_quat is not None else HELMET_BODY_QUAT)
     )
     shield_handle = tuple(
-        float(x)
-        for x in (
-            shield_handle_local if shield_handle_local is not None else HELMET_HANDLE_LOCAL
-        )
+        float(x) for x in (shield_handle_local if shield_handle_local is not None else HELMET_HANDLE_LOCAL)
     )
-    shield_scale = float(
-        shield_mesh_scale if shield_mesh_scale is not None else HELMET_MESH_SCALE
-    )
-    shield_color = tuple(
-        float(x) for x in (shield_rgba if shield_rgba is not None else HELMET_RGBA)
-    )
+    shield_scale = float(shield_mesh_scale if shield_mesh_scale is not None else HELMET_MESH_SCALE)
+    shield_color = tuple(float(x) for x in (shield_rgba if shield_rgba is not None else HELMET_RGBA))
 
     text = base.read_text(encoding="utf-8")
     text = _strip_reach_sword_blocks(text)

@@ -250,9 +250,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
         # No-op when use_pointmap is disabled (default), so plain SmolVLA is
         # byte-for-byte unchanged.
         if config.use_pointmap:
-            self.model.vlm_with_expert.init_pointmap_encoder(
-                freeze=config.freeze_pointmap_encoder
-            )
+            self.model.vlm_with_expert.init_pointmap_encoder(freeze=config.freeze_pointmap_encoder)
         self.reset()
 
     def reset(self):
@@ -388,7 +386,9 @@ class SmolVLAPolicy(PreTrainedPolicy):
         actions = self.prepare_action(batch)
         actions_is_pad = batch.get("action_is_pad")
         loss_dict = {}
-        losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time, pointmap=pointmap)
+        losses = self.model.forward(
+            images, img_masks, lang_tokens, lang_masks, state, actions, noise, time, pointmap=pointmap
+        )
         original_action_dim = self.config.action_feature.shape[0]
         losses = losses[:, :, :original_action_dim]
         loss_dict["losses_after_forward"] = losses.clone().mean().item()
@@ -431,9 +431,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
         # it, but it must NOT be treated as an RGB image here -- it has its own
         # normalization and a dedicated encoder (prepare_pointmaps / embed_prefix).
         pointmap_key = self.config.pointmap_feature if self.config.use_pointmap else None
-        present_img_keys = [
-            key for key in self.config.image_features if key in batch and key != pointmap_key
-        ]
+        present_img_keys = [key for key in self.config.image_features if key in batch and key != pointmap_key]
         missing_img_keys = [
             key for key in self.config.image_features if key not in batch and key != pointmap_key
         ]
@@ -687,7 +685,12 @@ class VLAFlowMatching(nn.Module):
         return time
 
     def embed_prefix(
-        self, images, img_masks, lang_tokens, lang_masks, state: torch.Tensor = None,
+        self,
+        images,
+        img_masks,
+        lang_tokens,
+        lang_masks,
+        state: torch.Tensor = None,
         pointmap: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Embed images with SigLIP and language tokens with embedding layer to prepare
@@ -843,7 +846,15 @@ class VLAFlowMatching(nn.Module):
         return embs, pad_masks, att_masks
 
     def forward(
-        self, images, img_masks, lang_tokens, lang_masks, state, actions, noise=None, time=None,
+        self,
+        images,
+        img_masks,
+        lang_tokens,
+        lang_masks,
+        state,
+        actions,
+        noise=None,
+        time=None,
         pointmap=None,
     ) -> Tensor:
         """Do a full training forward pass to compute the loss (batch_size x num_steps x num_motors)"""
@@ -857,7 +868,12 @@ class VLAFlowMatching(nn.Module):
         x_t = time_expanded * noise + (1 - time_expanded) * actions
         u_t = noise - actions
         prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
-            images, img_masks, lang_tokens, lang_masks, state=state, pointmap=pointmap,
+            images,
+            img_masks,
+            lang_tokens,
+            lang_masks,
+            state=state,
+            pointmap=pointmap,
         )
         suffix_embs, suffix_pad_masks, suffix_att_masks = self.embed_suffix(x_t, time)
 
@@ -901,7 +917,12 @@ class VLAFlowMatching(nn.Module):
             noise = self.sample_noise(actions_shape, device)
 
         prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
-            images, img_masks, lang_tokens, lang_masks, state=state, pointmap=pointmap,
+            images,
+            img_masks,
+            lang_tokens,
+            lang_masks,
+            state=state,
+            pointmap=pointmap,
         )
         prefix_att_2d_masks = make_att_2d_masks(prefix_pad_masks, prefix_att_masks)
         prefix_position_ids = torch.cumsum(prefix_pad_masks, dim=1) - 1

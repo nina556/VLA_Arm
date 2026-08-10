@@ -1,6 +1,6 @@
 # Reach-IK：单点抓取生成 + 顺序回放（剑位同步）
 
-日期：2026-07-27  
+日期：2026-07-27
 状态：在原「回放显示抓取点」基础上扩展；待用户确认后进入实现计划
 
 ## 目标
@@ -67,13 +67,13 @@
 
 **可以直接用于当前 Unoarm SmolVLA 微调**，前提是沿用现有 `dataset_features()` / `add_frame`（与 scripted 采数相同）。
 
-| 字段 | 形状 / 类型 | 与训练脚本 |
-|------|-------------|------------|
-| `action` | float32 `(16,)` | Unoarm 16 关节 |
-| `observation.state` | float32 `(16,)` | 同上 |
-| `observation.images.top` | image `(480,640,3)` | 需 `--rename_map` → `camera1` |
-| `observation.pointmap` | float32 `(480,640,3)` | `--policy.use_pointmap=true` |
-| `task` | 字符串 | 语言条件 |
+| 字段                     | 形状 / 类型           | 与训练脚本                    |
+| ------------------------ | --------------------- | ----------------------------- |
+| `action`                 | float32 `(16,)`       | Unoarm 16 关节                |
+| `observation.state`      | float32 `(16,)`       | 同上                          |
+| `observation.images.top` | image `(480,640,3)`   | 需 `--rename_map` → `camera1` |
+| `observation.pointmap`   | float32 `(480,640,3)` | `--policy.use_pointmap=true`  |
+| `task`                   | 字符串                | 语言条件                      |
 
 训练示例（把 `dataset.root` / `repo_id` 换成 Reach-IK 输出即可）：
 

@@ -30,8 +30,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from export_wrappers import DenoiseExportWrapper, PrefixExportWrapper  # noqa: E402
 from kv_utils import flatten_past_key_values, sorted_kv_keys  # noqa: E402
-from lerobot.policies.smolvla import SmolVLAConfig, SmolVLAPolicy  # noqa: E402
-from lerobot.policies.smolvla import modeling_smolvla as smolvla_modeling  # noqa: E402
+
+from lerobot.policies.smolvla import (  # noqa: E402
+    SmolVLAConfig,
+    SmolVLAPolicy,
+    modeling_smolvla as smolvla_modeling,  # noqa: E402
+)
 
 
 def _patch_sinusoidal_pos_embedding_fp32() -> None:
@@ -103,9 +107,7 @@ def build_dummy_inputs(policy: SmolVLAPolicy, device: torch.device) -> dict[str,
     cfg = policy.config
     h, w = cfg.resize_imgs_with_padding
     # Values already in SigLIP range [-1, 1] as produced by prepare_images.
-    images = {
-        f"image_{i}": torch.zeros(1, 3, h, w, device=device, dtype=torch.float32) for i in range(3)
-    }
+    images = {f"image_{i}": torch.zeros(1, 3, h, w, device=device, dtype=torch.float32) for i in range(3)}
     masks = {f"img_mask_{i}": torch.ones(1, device=device, dtype=torch.bool) for i in range(3)}
     return {
         **images,

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
-
 from gym_unoarm.constants import CONTROL_JOINTS
 
 from webapp.modes import AppMode, ModeError
@@ -100,7 +100,5 @@ async def stream_snapshots(websocket: WebSocket, runner: UnoarmWebRunner) -> Non
     finally:
         for task in (send_task, recv_task):
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, WebSocketDisconnect):
                 await task
-            except (asyncio.CancelledError, WebSocketDisconnect):
-                pass

@@ -7,6 +7,7 @@
 
 如需改 checkpoint / 语言指令 / 是否开画面，改下方 CONFIG 区即可。
 """
+
 import numpy as np
 import torch
 
@@ -22,7 +23,7 @@ SEED_BASE = 1000
 def main():
     print("=" * 60)
     print(f"加载模型 : {CHECKPOINT}")
-    print(f"语言指令 : \"{TASK_DESC}\"")
+    print(f'语言指令 : "{TASK_DESC}"')
     print(f"episodes : {N_EPISODES}")
     print(f"render   : {RENDER_MODE}")
     print("=" * 60)
@@ -43,7 +44,7 @@ def main():
             pretrained_path=CHECKPOINT,  # 用 checkpoint 里训练时保存的 processor
             preprocessor_overrides={"device_processor": {"device": str(device)}},
         )
-        print(f"processor 加载完成（来自 checkpoint）")
+        print("processor 加载完成（来自 checkpoint）")
     except Exception as e:
         print(f"从 checkpoint 加载 processor 失败：{e}")
         print("退而从零构造 processor...")
@@ -104,9 +105,7 @@ def main():
             # build_dataset_frame 会按 motor 名从 values 字典里取值，
             # 所以 observation.state 要传 {"motor_0": v0, "motor_1": v1, ...}
             state_np = np.asarray(obs["agent_pos"], dtype=np.float32)
-            lerobot_obs = {
-                f"motor_{i}": float(state_np[i]) for i in range(14)
-            }
+            lerobot_obs = {f"motor_{i}": float(state_np[i]) for i in range(14)}
             # 图像在 build_dataset_frame 里通过 values[key.removeprefix("observation.images.")] 取
             # 即 values["top"]，所以放在 "top" key 下
             lerobot_obs["top"] = np.asarray(obs["pixels"]["top"])
@@ -141,33 +140,27 @@ def main():
             step += 1
 
         success = bool(info.get("success", False)) or ep_reward > 0
-        print(
-            f"--- Episode {ep + 1}: steps={step}, "
-            f"reward={ep_reward:.3f}, success={success} ---"
-        )
+        print(f"--- Episode {ep + 1}: steps={step}, reward={ep_reward:.3f}, success={success} ---")
         print()
         if success:
             success_count += 1
 
     # 5. 总结
     print("=" * 60)
-    print(f"=== 总结 ===")
-    print(
-        f"成功率: {success_count}/{N_EPISODES} = "
-        f"{success_count / max(N_EPISODES, 1) * 100:.1f}%"
-    )
+    print("=== 总结 ===")
+    print(f"成功率: {success_count}/{N_EPISODES} = {success_count / max(N_EPISODES, 1) * 100:.1f}%")
     print("=" * 60)
 
     env.close()
 
 
 # 延迟 import：让 CONFIG 区的 print 先输出，import 报错也更清楚
-import gymnasium as gym
 import gym_aloha  # noqa: F401  触发 gym_aloha namespace 注册
-from lerobot.policies.smolvla import SmolVLAPolicy
-from lerobot.policies import make_pre_post_processors
-from lerobot.policies.utils import build_inference_frame
+import gymnasium as gym
 
+from lerobot.policies import make_pre_post_processors
+from lerobot.policies.smolvla import SmolVLAPolicy
+from lerobot.policies.utils import build_inference_frame
 
 if __name__ == "__main__":
     main()

@@ -92,10 +92,16 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_IDLE_ACTION_TOLERANCE,
         help="Raw joint tolerance used to detect leading idle actions.",
     )
-    parser.add_argument("--seed", type=int, default=0, help="Base random seed; each episode uses seed + episode_index.")
-    parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT, help="Dataset output directory.")
+    parser.add_argument(
+        "--seed", type=int, default=0, help="Base random seed; each episode uses seed + episode_index."
+    )
+    parser.add_argument(
+        "--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT, help="Dataset output directory."
+    )
     parser.add_argument("--repo-id", type=str, default=DEFAULT_REPO_ID, help="LeRobot dataset repo id.")
-    parser.add_argument("--overwrite", action="store_true", help="Remove an existing dataset at --output-root first.")
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Remove an existing dataset at --output-root first."
+    )
     return parser.parse_args()
 
 

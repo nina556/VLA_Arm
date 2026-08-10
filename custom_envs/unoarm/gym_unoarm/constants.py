@@ -144,14 +144,14 @@ TABLE_SIZE = (0.22, 0.22, 0.03)
 TABLE_PLACE_POS = (0.0, -0.75, 0.78)
 TABLE_PLACE_HALF = (0.38, 0.28, 0.04)
 TABLE_PLACE_RGBA = (0.55, 0.42, 0.28, 1.0)
-TABLE_PLACE_THREE_COLOR = 0x8c6b47
+TABLE_PLACE_THREE_COLOR = 0x8C6B47
 # Peg: upright cylinder; body at geometric center; grasp site at top.
 # Radius sized so the right-gripper main fingers (inner spacing ~0.046 m) can
 # wrap around it without clipping through the mesh.
 PEG_RADIUS = 0.018
 PEG_HALF_HEIGHT = 0.045  # full height 9 cm
 PEG_RGBA = (0.85, 0.35, 0.2, 1.0)
-PEG_THREE_COLOR = 0xd95a33
+PEG_THREE_COLOR = 0xD95A33
 # Default peg XY on the table (robot-right / −X). Z recomputed from table top.
 # Keep near the robot-facing table edge so IK stays reachable after the table
 # was shifted −0.20 m in Y.
@@ -160,7 +160,7 @@ PEG_DEFAULT_XY = (-0.20, -0.58)
 TABLE_CIRCLE_CENTER_XY = (0.0, -0.60)
 TABLE_CIRCLE_RADIUS = 0.06
 TABLE_CIRCLE_RGBA = (0.15, 0.75, 0.35, 0.9)
-TABLE_CIRCLE_THREE_COLOR = 0x26bf59
+TABLE_CIRCLE_THREE_COLOR = 0x26BF59
 
 # Multi-point peg sampling: stay on the table AND inside a reachable workspace.
 # Bounds are world XY (m). Generation intersects table-inset ∩ this box.
@@ -174,8 +174,8 @@ PEG_MIN_DIST_FROM_CIRCLE = float(TABLE_CIRCLE_RADIUS + PEG_RADIUS + 0.03)
 # The peg is a kinematic body driven by direct body_pos writes; on release we
 # integrate a simple vertical free-fall (gravity + table contact) instead of
 # snapping it to the table instantly.
-PEG_GRAVITY = 9.81          # m/s^2, downward
-PEG_FALL_MAX_STEPS = 60     # safety: stop falling after this many env steps
+PEG_GRAVITY = 9.81  # m/s^2, downward
+PEG_FALL_MAX_STEPS = 60  # safety: stop falling after this many env steps
 PEG_REST_Z_OFFSET = 0.0001  # tiny lift above table to avoid z-fighting
 
 # Grasp detection for table_place: the peg is grasped when BOTH jaw sides are
@@ -192,9 +192,9 @@ PEG_GRASP_BETWEEN_HI = 0.95
 
 # Visual: bright white (MuJoCo rgba + Three.js hex must stay in sync).
 SWORD_RGBA = (0.96, 0.97, 0.99, 1.0)
-SWORD_THREE_COLOR = 0xf5f7fa
+SWORD_THREE_COLOR = 0xF5F7FA
 HELMET_RGBA = (0.72, 0.78, 0.86, 1.0)
-HELMET_THREE_COLOR = 0xb8c6db
+HELMET_THREE_COLOR = 0xB8C6DB
 
 REACH_SWORD_XML_PATH = ASSETS_DIR / "mujoco_unoarm_reach_sword.xml"
 TABLE_PLACE_XML_PATH = ASSETS_DIR / "mujoco_unoarm_table_place.xml"
@@ -241,8 +241,7 @@ def peg_workspace_xy_bounds(
     y1 = min(float(ty1), float(max(yr[0], yr[1])))
     if x1 < x0 or y1 < y0:
         raise ValueError(
-            f"Empty peg workspace after intersecting table inset with "
-            f"x={xr}, y={yr}, margin={edge_margin}"
+            f"Empty peg workspace after intersecting table inset with x={xr}, y={yr}, margin={edge_margin}"
         )
     return (x0, y0), (x1, y1)
 
@@ -257,9 +256,7 @@ def is_peg_xy_in_workspace(
 ) -> bool:
     """True when peg XY is on-table, in workspace, and clear of the place circle."""
     x, y = float(xy[0]), float(xy[1])
-    (x0, y0), (x1, y1) = peg_workspace_xy_bounds(
-        edge_margin=edge_margin, x_range=x_range, y_range=y_range
-    )
+    (x0, y0), (x1, y1) = peg_workspace_xy_bounds(edge_margin=edge_margin, x_range=x_range, y_range=y_range)
     if not (x0 - 1e-9 <= x <= x1 + 1e-9 and y0 - 1e-9 <= y <= y1 + 1e-9):
         return False
     cx, cy = float(TABLE_CIRCLE_CENTER_XY[0]), float(TABLE_CIRCLE_CENTER_XY[1])
@@ -287,9 +284,7 @@ def clip_peg_xy_to_workspace(
 ) -> tuple[float, float]:
     """Clamp peg XY into the reachable on-table workspace box."""
     x, y = float(xy[0]), float(xy[1])
-    (x0, y0), (x1, y1) = peg_workspace_xy_bounds(
-        edge_margin=edge_margin, x_range=x_range, y_range=y_range
-    )
+    (x0, y0), (x1, y1) = peg_workspace_xy_bounds(edge_margin=edge_margin, x_range=x_range, y_range=y_range)
     return (min(max(x, x0), x1), min(max(y, y0), y1))
 
 
@@ -303,9 +298,7 @@ def sample_peg_xy(
     max_tries: int = 200,
 ) -> tuple[float, float]:
     """Sample a peg XY inside the workspace bounds (never outside the table)."""
-    (x0, y0), (x1, y1) = peg_workspace_xy_bounds(
-        edge_margin=edge_margin, x_range=x_range, y_range=y_range
-    )
+    (x0, y0), (x1, y1) = peg_workspace_xy_bounds(edge_margin=edge_margin, x_range=x_range, y_range=y_range)
     for _ in range(int(max_tries)):
         xy = (float(rng.uniform(x0, x1)), float(rng.uniform(y0, y1)))
         if is_peg_xy_in_workspace(

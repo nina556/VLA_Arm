@@ -110,9 +110,7 @@ class ChatRouter:
         )
         self.timeout_s = timeout_s
         self.verbose = verbose
-        self.history: list[dict[str, Any]] = [
-            {"role": "system", "content": _SYSTEM_PROMPT}
-        ]
+        self.history: list[dict[str, Any]] = [{"role": "system", "content": _SYSTEM_PROMPT}]
 
     def _log(self, message: str) -> None:
         if self.verbose:
@@ -123,8 +121,7 @@ class ChatRouter:
         self._log(f"收到用户输入: {user_input!r}")
         self.history.append({"role": "user", "content": user_input})
         self._log(
-            f"开始请求 LLM: model={self.model}, timeout={self.timeout_s:.1f}s, "
-            f"messages={len(self.history)}"
+            f"开始请求 LLM: model={self.model}, timeout={self.timeout_s:.1f}s, messages={len(self.history)}"
         )
         request_started = time.perf_counter()
         try:

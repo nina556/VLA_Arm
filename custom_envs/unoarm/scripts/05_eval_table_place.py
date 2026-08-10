@@ -27,11 +27,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lerobot.configs import PreTrainedConfig  # noqa: E402
-from lerobot.policies import make_pre_post_processors  # noqa: E402
-from lerobot.policies.act import ACTPolicy  # noqa: E402
-from lerobot.policies.utils import build_inference_frame  # noqa: E402
-
 from gym_unoarm.constants import (  # noqa: E402
     FPS,
     JOINTS,
@@ -40,6 +35,11 @@ from gym_unoarm.constants import (  # noqa: E402
     sample_peg_xy,
 )
 from gym_unoarm.env import UnoarmEnv  # noqa: E402
+
+from lerobot.configs import PreTrainedConfig  # noqa: E402
+from lerobot.policies import make_pre_post_processors  # noqa: E402
+from lerobot.policies.act import ACTPolicy  # noqa: E402
+from lerobot.policies.utils import build_inference_frame  # noqa: E402
 
 MAX_STEPS = 400  # training episodes ~220–330 frames
 # Default: draw eval peg XY from unique targets in the training meta.

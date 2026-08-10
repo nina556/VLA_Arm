@@ -27,12 +27,12 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from export_wrappers import DenoiseExportWrapper, PrefixExportWrapper  # noqa: E402
 from export_smolvla_onnx import (  # noqa: E402
     _patch_sinusoidal_pos_embedding_fp32,
     build_dummy_inputs,
     load_policy,
 )
+from export_wrappers import DenoiseExportWrapper, PrefixExportWrapper  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

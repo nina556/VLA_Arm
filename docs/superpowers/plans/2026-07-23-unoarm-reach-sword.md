@@ -22,6 +22,7 @@
 ### Task 1: Scene constants + reach XML builder + Env success
 
 **Files:**
+
 - Create: `custom_envs/unoarm/gym_unoarm/reach_scene.py`
 - Modify: `custom_envs/unoarm/gym_unoarm/constants.py`
 - Modify: `custom_envs/unoarm/gym_unoarm/env.py`
@@ -30,6 +31,7 @@
 - Copy/link: `data/sword.stl` → `custom_envs/unoarm/gym_unoarm/meshes/sword.stl`
 
 **Interfaces:**
+
 - `SCENE_FREE_SPACE = "free_space"`, `SCENE_REACH_SWORD = "reach_sword"`
 - `TASK_REACH_SWORD = "Reach the sword handle"`
 - `REACH_SUCCESS_THRESHOLD = 0.05`
@@ -48,11 +50,13 @@
 ### Task 2: Web backend scene switch + snapshot fields
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/webapp/runner.py`
 - Modify: `custom_envs/unoarm/scripts/09_web_interact.py`
 - Modify: `custom_envs/unoarm/webapp/app.py` (mount `/assets` for `data/`)
 
 **Interfaces:**
+
 - `WebConfig.scene: str`
 - Env constructed with `scene=cfg.scene`
 - `snapshot()["scene"]` dict with name + sword pose/scale/url + handle_local
@@ -67,6 +71,7 @@
 ### Task 3: Three.js sword + optional handle marker
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/static/web/js/scene.js`
 - Modify: `custom_envs/unoarm/static/web/js/main.js`
 - Modify: `custom_envs/unoarm/README.md` (short reach_sword usage)

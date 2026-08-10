@@ -175,15 +175,11 @@ class SmolVLMWithExpertModel(nn.Module):
     def embed_pointmap(self, pointmap: torch.Tensor):
         """Encode a pointmap with the dedicated SigLIP tower (mirrors embed_image)."""
         if self.pointmap_vision_model is None:
-            raise RuntimeError(
-                "init_pointmap_encoder() must be called before embed_pointmap()."
-            )
-        hidden = (
-            self.pointmap_vision_model(
-                pixel_values=pointmap.to(dtype=self.pointmap_vision_model.dtype),
-                patch_attention_mask=None,
-            ).last_hidden_state
-        )
+            raise RuntimeError("init_pointmap_encoder() must be called before embed_pointmap().")
+        hidden = self.pointmap_vision_model(
+            pixel_values=pointmap.to(dtype=self.pointmap_vision_model.dtype),
+            patch_attention_mask=None,
+        ).last_hidden_state
         hidden = self.pointmap_connector(hidden)
         return hidden
 

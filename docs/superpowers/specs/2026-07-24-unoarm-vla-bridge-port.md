@@ -1,7 +1,7 @@
 # Unoarm VLA 外部桥接 — 完整改动总结（供迁移到最新 Web）
 
-> 来源：在 `40eed41` 上开发的桥接功能。对端接口见  
-> `/home/doki/project/edge-robot-agent/docs/mujoco_vla_bridge_api.md`  
+> 来源：在 `40eed41` 上开发的桥接功能。对端接口见
+> `/home/doki/project/edge-robot-agent/docs/mujoco_vla_bridge_api.md`
 > 本文件用于丢弃旧工作树后，在最新 Web（settings_store 版）原样恢复。
 
 ## 1. 目标行为（方案 A）
@@ -16,18 +16,18 @@
 
 ## 2. 默认配置
 
-| 项 | 值 |
-|---|---|
-| Base URL | `http://192.168.10.38:8765` |
-| Path | `/api/mujoco/vla_joint_chunk` |
-| `command_type` | `joint_chunk` |
-| `unit` | `rad` |
-| `arms` | `both`（可选 `right` / `left`） |
-| `fps` | `20`（与 `FPS` 一致） |
-| `execute` | `true`（可关做 dry-run） |
-| `result_timeout_sec` | `5` |
-| `http_timeout_sec` | `8` |
-| chunk 大小 | `n_action_steps` |
+| 项                   | 值                              |
+| -------------------- | ------------------------------- |
+| Base URL             | `http://192.168.10.38:8765`     |
+| Path                 | `/api/mujoco/vla_joint_chunk`   |
+| `command_type`       | `joint_chunk`                   |
+| `unit`               | `rad`                           |
+| `arms`               | `both`（可选 `right` / `left`） |
+| `fps`                | `20`（与 `FPS` 一致）           |
+| `execute`            | `true`（可关做 dry-run）        |
+| `result_timeout_sec` | `5`                             |
+| `http_timeout_sec`   | `8`                             |
+| chunk 大小           | `n_action_steps`                |
 
 ### 请求体示例
 
@@ -39,7 +39,7 @@
   "fps": 20,
   "execute": true,
   "result_timeout_sec": 5,
-  "actions": [[/* 16 floats rad */, "..."]],
+  "actions": [[, /* 16 floats rad */ "..."]],
   "meta": { "instruction": "<task string>" }
 }
 ```
@@ -50,23 +50,23 @@
 
 ### 新建（可直接拷回最新树）
 
-| 路径 | 职责 |
-|---|---|
-| `custom_envs/unoarm/webapp/vla_bridge_client.py` | `BridgeConfig` / `build_joint_chunk_body` / `VlaBridgeClient`（urllib JSON POST）；保留可选 `denormalize_actions` 仅供烟测 `--from-normalized`，**rollout 不用** |
-| `custom_envs/unoarm/scripts/test_vla_bridge.py` | 独立烟测 CLI |
-| `custom_envs/unoarm/tests/test_vla_bridge_client.py` | 单测（body / config / mock POST / denorm helper） |
-| `docs/superpowers/specs/2026-07-24-unoarm-vla-bridge-design.md` | 短设计备忘 |
+| 路径                                                            | 职责                                                                                                                                                             |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `custom_envs/unoarm/webapp/vla_bridge_client.py`                | `BridgeConfig` / `build_joint_chunk_body` / `VlaBridgeClient`（urllib JSON POST）；保留可选 `denormalize_actions` 仅供烟测 `--from-normalized`，**rollout 不用** |
+| `custom_envs/unoarm/scripts/test_vla_bridge.py`                 | 独立烟测 CLI                                                                                                                                                     |
+| `custom_envs/unoarm/tests/test_vla_bridge_client.py`            | 单测（body / config / mock POST / denorm helper）                                                                                                                |
+| `docs/superpowers/specs/2026-07-24-unoarm-vla-bridge-design.md` | 短设计备忘                                                                                                                                                       |
 
 ### 旧版（40eed41 CLI 配置）曾改动的文件
 
-| 路径 | 改动要点 |
-|---|---|
-| `webapp/runner.py` | `WebConfig` 增加 bridge_*；初始化 `VlaBridgeClient`；`get/set_bridge_config`；`_flush_bridge_chunk`；`_rollout_loop` 镜像后取 raw qpos 攒包发送 |
-| `webapp/app.py` | `BridgeConfigRequest`；`GET/POST /api/bridge` |
-| `scripts/09_web_interact.py` | `--bridge` / `--bridge-base-url` / `--bridge-arms` / `--bridge-execute` 传入 WebConfig |
-| `static/web/index.html` | 对话区顶部 bridge 面板：enabled / URL / arms / execute / 应用按钮 |
-| `static/web/js/main.js` | load/save `/api/bridge` |
-| `static/web/css/app.css` | `.bridge-panel` 等样式 |
+| 路径                         | 改动要点                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `webapp/runner.py`           | `WebConfig` 增加 bridge\_\*；初始化 `VlaBridgeClient`；`get/set_bridge_config`；`_flush_bridge_chunk`；`_rollout_loop` 镜像后取 raw qpos 攒包发送 |
+| `webapp/app.py`              | `BridgeConfigRequest`；`GET/POST /api/bridge`                                                                                                     |
+| `scripts/09_web_interact.py` | `--bridge` / `--bridge-base-url` / `--bridge-arms` / `--bridge-execute` 传入 WebConfig                                                            |
+| `static/web/index.html`      | 对话区顶部 bridge 面板：enabled / URL / arms / execute / 应用按钮                                                                                 |
+| `static/web/js/main.js`      | load/save `/api/bridge`                                                                                                                           |
+| `static/web/css/app.css`     | `.bridge-panel` 等样式                                                                                                                            |
 
 ### 非桥接、同会话其它改动（迁移时**不要**当作桥接需求）
 

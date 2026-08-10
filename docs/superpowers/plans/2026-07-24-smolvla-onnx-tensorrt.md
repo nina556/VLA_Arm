@@ -20,22 +20,24 @@
 
 ## File Structure
 
-| File | Responsibility |
-|------|----------------|
-| `examples/smolvla_onnx/kv_utils.py` | Flatten / unflatten `past_key_values` dict ↔ named tensors |
-| `examples/smolvla_onnx/export_wrappers.py` | `PrefixExportWrapper`, `DenoiseExportWrapper` |
+| File                                           | Responsibility                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| `examples/smolvla_onnx/kv_utils.py`            | Flatten / unflatten `past_key_values` dict ↔ named tensors        |
+| `examples/smolvla_onnx/export_wrappers.py`     | `PrefixExportWrapper`, `DenoiseExportWrapper`                      |
 | `examples/smolvla_onnx/export_smolvla_onnx.py` | CLI: load policy, dry-run shapes, export ONNX + `export_meta.json` |
-| `examples/smolvla_onnx/run_smolvla_onnx.py` | CLI: ORT schedule 10 steps; optional PyTorch compare |
-| `examples/smolvla_onnx/README.md` | Commands + `trtexec` hints |
+| `examples/smolvla_onnx/run_smolvla_onnx.py`    | CLI: ORT schedule 10 steps; optional PyTorch compare               |
+| `examples/smolvla_onnx/README.md`              | Commands + `trtexec` hints                                         |
 
 ---
 
 ### Task 1: KV flatten/unflatten helpers
 
 **Files:**
+
 - Create: `examples/smolvla_onnx/kv_utils.py`
 
 **Interfaces:**
+
 - Produces:
   - `flatten_past_key_values(past: dict[int, dict[str, Tensor]]) -> dict[str, Tensor]`
   - `unflatten_past_key_values(flat: dict[str, Tensor]) -> dict[int, dict[str, Tensor]]`
@@ -100,9 +102,11 @@ Expected: `ok ['kv_0_key', 'kv_0_value']`
 ### Task 2: Export wrappers
 
 **Files:**
+
 - Create: `examples/smolvla_onnx/export_wrappers.py`
 
 **Interfaces:**
+
 - Consumes: `VLAFlowMatching` as `policy.model`; `flatten_past_key_values` / `unflatten_past_key_values`
 - Produces:
   - `PrefixExportWrapper.forward(image_0, image_1, image_2, img_mask_0, img_mask_1, img_mask_2, lang_tokens, lang_masks, state) -> tuple` leading with `prefix_pad_masks` then sorted KV tensors
@@ -184,9 +188,11 @@ class DenoiseExportWrapper(nn.Module):
 ### Task 3: Export CLI + meta
 
 **Files:**
+
 - Create: `examples/smolvla_onnx/export_smolvla_onnx.py`
 
 **Interfaces:**
+
 - CLI args: `--checkpoint`, `--output-dir`, `--device`, `--vlm-path` (optional override)
 - Writes: `smolvla_prefix.onnx`, `smolvla_denoise.onnx`, `export_meta.json`
 
@@ -214,6 +220,7 @@ Expected: three files under `data/outputs/20000/onnx/`; `onnx.checker` OK.
 ### Task 4: ORT runner + numeric check
 
 **Files:**
+
 - Create: `examples/smolvla_onnx/run_smolvla_onnx.py`
 
 - [ ] **Step 1: Implement scheduler** reading `export_meta.json`, running prefix once + 10 denoise steps; optional `--compare-pytorch` printing max abs diff.
@@ -235,6 +242,7 @@ Expected: action shape `[1,50,16]`; max abs diff reported (target `< 1e-3` FP32,
 ### Task 5: README
 
 **Files:**
+
 - Create: `examples/smolvla_onnx/README.md`
 
 - [ ] **Step 1: Document** export/run commands, I/O tables, `trtexec` example lines for both ONNX files, known limitations (tokenizer outside graph, TRT op support TBD).
@@ -243,12 +251,12 @@ Expected: action shape `[1,50,16]`; max abs diff reported (target `< 1e-3` FP32,
 
 ## Spec coverage checklist
 
-- Dual ONNX prefix/denoise → Tasks 2–3  
-- Scheduler 10 steps + crop 16 → Task 4  
-- ORT numeric check → Task 4  
-- README + trtexec → Task 5  
-- Fixed shapes / Python preprocess → Tasks 3–4  
-- No training code change → Global constraint  
+- Dual ONNX prefix/denoise → Tasks 2–3
+- Scheduler 10 steps + crop 16 → Task 4
+- ORT numeric check → Task 4
+- README + trtexec → Task 5
+- Fixed shapes / Python preprocess → Tasks 3–4
+- No training code change → Global constraint
 
 ## Execution
 

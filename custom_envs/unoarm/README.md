@@ -47,7 +47,7 @@ UNOARM_MODEL_DIR=/path/to/unoarm_model \
 uv run python custom_envs/unoarm/scripts/09_web_interact.py
 ```
 
-启动后会自动用 **Windows Chrome**（带 WebGL 参数）打开页面。  
+启动后会自动用 **Windows Chrome**（带 WebGL 参数）打开页面。
 不要用 Cursor 内置 Simple Browser / 预览页——那种环境里 `GL_VENDOR=Disabled`，WebGL 无法创建，和剑模型无关。
 
 若需手动打开：
@@ -131,8 +131,8 @@ custom_envs/unoarm/data/designs/<name>.poses.json    # 给数据生成用的扁�
 {
   "task": "Prepare to fight and then taunt.",
   "poses": [
-    {"Left_Joint1": 0.5, "...": "..."},
-    {"Left_Joint1": 1.0, "...": "..."}
+    { "Left_Joint1": 0.5, "...": "..." },
+    { "Left_Joint1": 1.0, "...": "..." }
   ]
 }
 ```
@@ -190,13 +190,13 @@ custom_envs/unoarm/data/unoarm_<name>/
 
 ### 相关模块
 
-| 路径 | 作用 |
-|------|------|
-| `scripts/09_web_interact.py` | 启动入口 |
-| `webapp/` | FastAPI、模式切换、仿真 Runner |
-| `pose_design/` | 关键帧 / 播放列表 / 导出 / 预览 |
-| `data_gen/` | 插值扰动数据集生成（CLI 与 Web 共用） |
-| `static/web/` | 前端页面 |
+| 路径                         | 作用                                  |
+| ---------------------------- | ------------------------------------- |
+| `scripts/09_web_interact.py` | 启动入口                              |
+| `webapp/`                    | FastAPI、模式切换、仿真 Runner        |
+| `pose_design/`               | 关键帧 / 播放列表 / 导出 / 预览       |
+| `data_gen/`                  | 插值扰动数据集生成（CLI 与 Web 共用） |
+| `static/web/`                | 前端页面                              |
 
 ## Smoke tests
 

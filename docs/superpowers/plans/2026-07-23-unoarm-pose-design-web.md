@@ -22,12 +22,14 @@
 ### Task 1: Extract `data_gen.scripted` from `06`
 
 **Files:**
+
 - Create: `custom_envs/unoarm/data_gen/__init__.py`
 - Create: `custom_envs/unoarm/data_gen/scripted.py`
 - Modify: `custom_envs/unoarm/scripts/06_generate_scripted_data.py` (thin CLI)
 - Test: `custom_envs/unoarm/tests/test_data_gen_scripted.py`
 
 **Interfaces:**
+
 - Produces: `load_poses_from_json(path) -> tuple[str, list[np.ndarray]]`, `build_pose_sequence`, `build_episode_actions`, `interpolate`, `clip_raw_pose`, `dataset_features`, `add_frame`, `generate_scripted_dataset(cfg, log=...) -> Path`, `ScriptedGenConfig` dataclass, `RAW_ZERO`, `EXPECTED_ACTION_ORDER`
 
 - [ ] **Step 1:** Create `data_gen/scripted.py` by moving logic from `06` (keep behavior identical). Add `ScriptedGenConfig` and `generate_scripted_dataset(config, *, log=print) -> Path`.
@@ -40,6 +42,7 @@
 ### Task 2: `pose_design` models, export, store, preview
 
 **Files:**
+
 - Create: `custom_envs/unoarm/pose_design/__init__.py`
 - Create: `custom_envs/unoarm/pose_design/models.py`
 - Create: `custom_envs/unoarm/pose_design/export.py`
@@ -48,14 +51,15 @@
 - Test: `custom_envs/unoarm/tests/test_pose_design.py`
 
 **Interfaces:**
+
 - Produces:
   - `DesignProject(version, name, task, keyframes: dict[str, dict[str, float]], playlist: list[str])`
   - `slugify_name(name: str) -> str`
   - `validate_project(project) -> None` (raises ValueError)
   - `expand_playlist(project) -> list[dict[str, float]]`
-  - `to_poses_payload(project) -> dict`  # `{task, poses}`
+  - `to_poses_payload(project) -> dict` # `{task, poses}`
   - `DesignStore(root: Path)` with `list()`, `save(project)`, `load(name)`, `delete(name)`
-  - `build_preview_trajectory(project, segment_steps: int) -> list[np.ndarray]`  # linear, no noise, no RAW_ZERO wrap
+  - `build_preview_trajectory(project, segment_steps: int) -> list[np.ndarray]` # linear, no noise, no RAW_ZERO wrap
 
 - [ ] **Step 1:** Write failing tests for slugify, validate, expand (incl. repeats), store roundtrip, preview length.
 - [ ] **Step 2:** Implement modules to pass tests.
@@ -66,6 +70,7 @@
 ### Task 3: Split webapp core (modes + runner + app shell)
 
 **Files:**
+
 - Create: `custom_envs/unoarm/webapp/__init__.py`
 - Create: `custom_envs/unoarm/webapp/modes.py`
 - Create: `custom_envs/unoarm/webapp/runner.py` (move `UnoarmWebRunner` from `09`)
@@ -76,6 +81,7 @@
 - Test: `custom_envs/unoarm/tests/test_webapp_modes.py`
 
 **Interfaces:**
+
 - Produces: `AppMode` enum / Literal; `ModeController` with `mode`, `set_mode(mode)`, `require_mode(*allowed)` raising HTTP-friendly errors; runner API unchanged from current chat behavior
 
 - [ ] **Step 1:** Implement `modes.py` + tests (chat→design stops conceptually; design blocks chat actions).
@@ -87,11 +93,13 @@
 ### Task 4: Design APIs + live pose sync
 
 **Files:**
+
 - Modify: `webapp/app.py`, `webapp/runner.py`, `webapp/ws.py`
 - Modify: `static/web/js/design.js`, `main.js`, `css/app.css`, `index.html`
 - Test: `custom_envs/unoarm/tests/test_design_api.py` (mode gates + save/list with tmp dir)
 
 **Behavior:**
+
 - WS client may send `{type:"design_pose", pose:[16 floats raw]}` when mode=design
 - Runner applies raw pose via env denormalize path inverted: set qpos from raw + mimics + mj_forward; update obs/joint_state for stream
 - HTTP endpoints per spec section 6.3
@@ -107,6 +115,7 @@
 ### Task 5: Generate-from-web + wire `06` CLI path
 
 **Files:**
+
 - Modify: `webapp/app.py`, `static/web/js/design.js`
 - Reuse: `data_gen.scripted.generate_scripted_dataset`
 - Test: mock/short generate status transitions (`idle→running→done` / fail on existing dir)
@@ -120,6 +129,7 @@
 ### Task 6: Docs touch-up
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/README.md` (short section on design mode + JSON layout)
 
 - [ ] **Step 1:** Document how to launch, design, save, generate
@@ -129,14 +139,14 @@
 
 ## Spec coverage check
 
-| Spec requirement | Task |
-|------------------|------|
-| Keyframe library + playlist | 2, 4 |
-| Mode switch exclusive | 3, 4 |
-| Live 16D + keyboard | 4 |
-| Simple preview | 2, 4 |
-| Dual JSON save | 2, 4 |
-| List / load / delete / generate | 4, 5 |
-| Extract `06` module | 1, 5 |
-| Modular layout, thin `09` | 3 |
-| Scrollable chat composer fix already done | — |
+| Spec requirement                          | Task |
+| ----------------------------------------- | ---- |
+| Keyframe library + playlist               | 2, 4 |
+| Mode switch exclusive                     | 3, 4 |
+| Live 16D + keyboard                       | 4    |
+| Simple preview                            | 2, 4 |
+| Dual JSON save                            | 2, 4 |
+| List / load / delete / generate           | 4, 5 |
+| Extract `06` module                       | 1, 5 |
+| Modular layout, thin `09`                 | 3    |
+| Scrollable chat composer fix already done | —    |

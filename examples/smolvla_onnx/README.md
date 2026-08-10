@@ -2,8 +2,8 @@
 
 将训练好的 SmolVLA 导出为两个 ONNX：
 
-1. `smolvla_prefix.onnx`：图像 + language tokens + state → KV cache  
-2. `smolvla_denoise.onnx`：noisy action + timestep + KV → velocity  
+1. `smolvla_prefix.onnx`：图像 + language tokens + state → KV cache
+2. `smolvla_denoise.onnx`：noisy action + timestep + KV → velocity
 
 Python / TensorRT 宿主循环 10 步 flow matching，得到 action chunk。
 
@@ -52,12 +52,12 @@ uv run python examples/smolvla_onnx/run_smolvla_onnx.py \
 
 ## 输入约定（ONNX 图内）
 
-| 张量 | Shape | 说明 |
-|------|-------|------|
-| `image_*` | `[1,3,512,512]` | 已 resize-pad，且已映射到 SigLIP `[-1,1]`（等同 `prepare_images`） |
-| `lang_tokens` / `lang_masks` | `[1,48]` | tokenizer 输出（不在图内） |
-| `state` | `[1,32]` | pad 后的 state（MEAN_STD 在 Python preprocessor） |
-| `x_t` | `[1,50,32]` | denoise 输入噪声 / 中间状态 |
+| 张量                         | Shape           | 说明                                                               |
+| ---------------------------- | --------------- | ------------------------------------------------------------------ |
+| `image_*`                    | `[1,3,512,512]` | 已 resize-pad，且已映射到 SigLIP `[-1,1]`（等同 `prepare_images`） |
+| `lang_tokens` / `lang_masks` | `[1,48]`        | tokenizer 输出（不在图内）                                         |
+| `state`                      | `[1,32]`        | pad 后的 state（MEAN_STD 在 Python preprocessor）                  |
+| `x_t`                        | `[1,50,32]`     | denoise 输入噪声 / 中间状态                                        |
 
 Tokenizer、MEAN_STD 归一化 / 反归一化仍在 Python（LeRobot pre/post processors）。
 
@@ -79,7 +79,7 @@ trtexec --onnx=data/outputs/20000/onnx/smolvla_denoise.onnx \
 
 ## 已知限制
 
-- batch=1、3 相机、`num_steps=10` 固定，无动态轴  
-- 旧版 TorchScript `dynamo=False` 导出会在 SmolVLM vision mask 处失败，必须用 dynamo  
-- 大模型权重在旁路 `.onnx.data`，拷贝时请成对带走  
+- batch=1、3 相机、`num_steps=10` 固定，无动态轴
+- 旧版 TorchScript `dynamo=False` 导出会在 SmolVLM vision mask 处失败，必须用 dynamo
+- 大模型权重在旁路 `.onnx.data`，拷贝时请成对带走
 - 导出时强制 float32，并把 timestep 正弦位置编码从 float64 改为 float32（ORT CPU 无 double Cos）

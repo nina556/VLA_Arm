@@ -14,6 +14,7 @@ from gym_unoarm.sword_pose import (
     default_sword_euler_deg,
     default_sword_handle_pos,
 )
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SETTINGS_PATH = ROOT / "data" / "web_settings.json"
 
@@ -114,18 +115,12 @@ def load_settings(path: Path | None = None) -> dict[str, Any]:
     merged["bridge_execute"] = bool(merged.get("bridge_execute", True))
     merged["bridge_result_timeout_sec"] = float(merged.get("bridge_result_timeout_sec", 5.0))
     merged["bridge_http_timeout_sec"] = float(merged.get("bridge_http_timeout_sec", 8.0))
-    merged["sword_handle_pos"] = _normalize_vec3(
-        merged.get("sword_handle_pos"), default_sword_handle_pos()
-    )
-    merged["sword_euler_deg"] = _normalize_vec3(
-        merged.get("sword_euler_deg"), default_sword_euler_deg()
-    )
+    merged["sword_handle_pos"] = _normalize_vec3(merged.get("sword_handle_pos"), default_sword_handle_pos())
+    merged["sword_euler_deg"] = _normalize_vec3(merged.get("sword_euler_deg"), default_sword_euler_deg())
     merged["shield_handle_pos"] = _normalize_vec3(
         merged.get("shield_handle_pos"), default_shield_handle_pos()
     )
-    merged["shield_euler_deg"] = _normalize_vec3(
-        merged.get("shield_euler_deg"), default_shield_euler_deg()
-    )
+    merged["shield_euler_deg"] = _normalize_vec3(merged.get("shield_euler_deg"), default_shield_euler_deg())
     merged["enable_execution_point"] = bool(merged.get("enable_execution_point", False))
     merged["execution_point_pos"] = _normalize_vec3(
         merged.get("execution_point_pos"), list(DEFAULT_EXECUTION_POINT_POS)
@@ -143,18 +138,12 @@ def save_settings(data: dict[str, Any], path: Path | None = None) -> Path:
     if isinstance(tasks, str):
         tasks = [line.strip() for line in tasks.splitlines() if line.strip()]
     payload["allowed_tasks"] = [str(t).strip() for t in tasks if str(t).strip()]
-    payload["sword_handle_pos"] = _normalize_vec3(
-        payload.get("sword_handle_pos"), default_sword_handle_pos()
-    )
-    payload["sword_euler_deg"] = _normalize_vec3(
-        payload.get("sword_euler_deg"), default_sword_euler_deg()
-    )
+    payload["sword_handle_pos"] = _normalize_vec3(payload.get("sword_handle_pos"), default_sword_handle_pos())
+    payload["sword_euler_deg"] = _normalize_vec3(payload.get("sword_euler_deg"), default_sword_euler_deg())
     payload["shield_handle_pos"] = _normalize_vec3(
         payload.get("shield_handle_pos"), default_shield_handle_pos()
     )
-    payload["shield_euler_deg"] = _normalize_vec3(
-        payload.get("shield_euler_deg"), default_shield_euler_deg()
-    )
+    payload["shield_euler_deg"] = _normalize_vec3(payload.get("shield_euler_deg"), default_shield_euler_deg())
     payload["enable_execution_point"] = bool(payload.get("enable_execution_point", False))
     payload["execution_point_pos"] = _normalize_vec3(
         payload.get("execution_point_pos"), list(DEFAULT_EXECUTION_POINT_POS)
@@ -192,9 +181,7 @@ def merge_settings_patch(
             merged["api_key"] = text.strip()
             continue
         if key == "allowed_tasks" and isinstance(value, str):
-            merged["allowed_tasks"] = [
-                line.strip() for line in value.splitlines() if line.strip()
-            ]
+            merged["allowed_tasks"] = [line.strip() for line in value.splitlines() if line.strip()]
             continue
         if key == "sword_handle_pos":
             merged["sword_handle_pos"] = _normalize_vec3(value, default_sword_handle_pos())
@@ -209,9 +196,7 @@ def merge_settings_patch(
             merged["shield_euler_deg"] = _normalize_vec3(value, default_shield_euler_deg())
             continue
         if key == "execution_point_pos":
-            merged["execution_point_pos"] = _normalize_vec3(
-                value, list(DEFAULT_EXECUTION_POINT_POS)
-            )
+            merged["execution_point_pos"] = _normalize_vec3(value, list(DEFAULT_EXECUTION_POINT_POS))
             continue
         if key == "enable_execution_point":
             merged["enable_execution_point"] = bool(value)

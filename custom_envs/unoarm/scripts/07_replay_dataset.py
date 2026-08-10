@@ -9,12 +9,14 @@ from pathlib import Path
 import mujoco.viewer
 import numpy as np
 import torch
+
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from data_gen.table_place_ik import episode_peg_xy_from_meta  # noqa: E402
 from gym_unoarm.constants import (  # noqa: E402
     FPS,
     SCENE_FREE_SPACE,
@@ -22,12 +24,28 @@ from gym_unoarm.constants import (  # noqa: E402
     SCENE_TABLE_PLACE,
 )
 from gym_unoarm.env import UnoarmEnv, configure_viewer_camera, configure_viewer_theme  # noqa: E402
-from data_gen.table_place_ik import episode_peg_xy_from_meta  # noqa: E402
 
 DEFAULT_DATASET_ROOT = ROOT / "data" / "unoarm_prepare_fight_taunt"
 DEFAULT_REPO_ID = "doki/unoarm_prepare_fight_taunt"
 RAW_ZERO = np.zeros(16, dtype=np.float32)
-STATE_LABELS = ("L1", "L2", "L3", "L4", "L5", "L6", "L7", "LG", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "RG")
+STATE_LABELS = (
+    "L1",
+    "L2",
+    "L3",
+    "L4",
+    "L5",
+    "L6",
+    "L7",
+    "LG",
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "RG",
+)
 
 _SCENE_CHOICES = {
     "free_space": SCENE_FREE_SPACE,
@@ -42,11 +60,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-id", type=str, default=DEFAULT_REPO_ID, help="LeRobot dataset repo id.")
     parser.add_argument("--episode", type=int, default=0, help="Episode index to replay.")
     parser.add_argument("--speed", type=float, default=1.0, help="Playback speed multiplier.")
-    parser.add_argument("--loop", action="store_true", help="Loop the selected episode until the viewer closes.")
+    parser.add_argument(
+        "--loop", action="store_true", help="Loop the selected episode until the viewer closes."
+    )
     parser.add_argument("--dry-run", action="store_true", help="Replay without opening the MuJoCo viewer.")
     parser.add_argument("--print-every", type=int, default=25, help="Print progress every N frames.")
-    parser.add_argument("--state-every", type=int, default=1, help="Refresh terminal state display every N frames.")
-    parser.add_argument("--no-state-display", action="store_true", help="Disable live terminal state display.")
+    parser.add_argument(
+        "--state-every", type=int, default=1, help="Refresh terminal state display every N frames."
+    )
+    parser.add_argument(
+        "--no-state-display", action="store_true", help="Disable live terminal state display."
+    )
     parser.add_argument(
         "--state-units",
         choices=("raw", "normalized", "both"),
@@ -191,9 +215,7 @@ def resolve_scene_and_peg(
     if scene_override is not None:
         scene = _SCENE_CHOICES.get(scene_override)
         if scene is None:
-            raise ValueError(
-                f"Unknown --scene {scene_override!r}; choose from {list(_SCENE_CHOICES.keys())}"
-            )
+            raise ValueError(f"Unknown --scene {scene_override!r}; choose from {list(_SCENE_CHOICES.keys())}")
     else:
         # Auto-detect from meta files.
         if (root / "table_place_ik_meta.json").exists():
@@ -211,15 +233,12 @@ def resolve_scene_and_peg(
             meta_path = root / "table_place_ik_meta.json"
             if not meta_path.exists():
                 raise FileNotFoundError(
-                    f"--scene table_place requires table_place_ik_meta.json in {root} "
-                    "(or pass --peg-xy X Y)."
+                    f"--scene table_place requires table_place_ik_meta.json in {root} (or pass --peg-xy X Y)."
                 )
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             peg_xy = episode_peg_xy_from_meta(meta, episode_index)
             if peg_xy is None:
-                raise KeyError(
-                    f"peg_xy not found for episode {episode_index} in {meta_path}"
-                )
+                raise KeyError(f"peg_xy not found for episode {episode_index} in {meta_path}")
 
     return scene, peg_xy
 
@@ -235,16 +254,17 @@ def main() -> None:
         f"{dataset.num_frames} frames, {dataset.num_episodes} episode"
     )
 
-    scene, peg_xy = resolve_scene_and_peg(
-        args.root, args.scene, args.peg_xy, episode_index=args.episode
-    )
+    scene, peg_xy = resolve_scene_and_peg(args.root, args.scene, args.peg_xy, episode_index=args.episode)
     print(f"scene: {scene}")
     if peg_xy is not None:
         print(f"peg (cylinder) XY: {peg_xy}  (from dataset meta)")
 
-    env_kwargs: dict = dict(
-        obs_type="pixels_agent_pos", render_mode="rgb_array", max_episode_steps=10_000, scene=scene
-    )
+    env_kwargs: dict = {
+        "obs_type": "pixels_agent_pos",
+        "render_mode": "rgb_array",
+        "max_episode_steps": 10_000,
+        "scene": scene,
+    }
     if peg_xy is not None:
         env_kwargs["peg_xy"] = peg_xy
     env = UnoarmEnv(**env_kwargs)

@@ -102,9 +102,7 @@ def main() -> None:
     if has_json and has_bbox:
         print("warning: both --targets-json and bbox flags set; using JSON list", flush=True)
     if not has_json and not (args.bbox_min is not None and args.bbox_max is not None):
-        raise SystemExit(
-            "Provide --targets-json or both --bbox-min and --bbox-max (with --num-targets)."
-        )
+        raise SystemExit("Provide --targets-json or both --bbox-min and --bbox-max (with --num-targets).")
     if not has_json and args.num_targets < 1:
         raise SystemExit("bbox mode requires --num-targets >= 1")
 

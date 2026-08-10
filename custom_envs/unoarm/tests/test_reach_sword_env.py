@@ -40,7 +40,7 @@ def test_ensure_reach_sword_xml_contains_sites_and_sword():
     path = ensure_reach_sword_xml()
     assert path.exists()
     text = path.read_text(encoding="utf-8")
-    assert 'name="sword"' in text or "mesh=\"sword\"" in text
+    assert 'name="sword"' in text or 'mesh="sword"' in text
     assert 'name="shield"' in text
     assert "helmet.stl" in text
     assert 'name="left_tcp"' in text

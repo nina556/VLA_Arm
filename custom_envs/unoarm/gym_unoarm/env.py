@@ -40,7 +40,6 @@ from .constants import (
     SCENE_TABLE_PLACE,
     START_POSE,
     SWORD_HANDLE_LOCAL,
-    TABLE_CIRCLE_CENTER_XY,
     TABLE_CIRCLE_RADIUS,
     XML_PATH,
     clip_peg_xy_to_table,
@@ -115,9 +114,7 @@ class UnoarmEnv(gym.Env):
         else:
             self.execution_point_pos = tuple(float(x) for x in execution_point_pos)
         self._execution_point_passed = False
-        self.sword_body_pos = (
-            tuple(float(x) for x in sword_body_pos) if sword_body_pos is not None else None
-        )
+        self.sword_body_pos = tuple(float(x) for x in sword_body_pos) if sword_body_pos is not None else None
         self.sword_body_quat = (
             tuple(float(x) for x in sword_body_quat) if sword_body_quat is not None else None
         )
@@ -179,24 +176,16 @@ class UnoarmEnv(gym.Env):
         self._shield_home_pos = None
         self._shield_home_quat = None
         if self.scene == SCENE_REACH_SWORD:
-            self._tcp_site_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, REACH_TCP_SITE)
-            )
-            self._left_tcp_site_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "left_tcp")
-            )
+            self._tcp_site_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, REACH_TCP_SITE))
+            self._left_tcp_site_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "left_tcp"))
             self._handle_site_id = int(
                 mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "sword_handle")
             )
             self._shield_handle_site_id = int(
                 mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "shield_handle")
             )
-            self._sword_body_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "sword")
-            )
-            self._shield_body_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "shield")
-            )
+            self._sword_body_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "sword"))
+            self._shield_body_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "shield"))
             missing = [
                 name
                 for name, sid in (
@@ -210,21 +199,13 @@ class UnoarmEnv(gym.Env):
                 if sid < 0
             ]
             if missing:
-                raise ValueError(
-                    f"Reach scene XML missing sites/bodies {missing}: {self.xml_path}"
-                )
+                raise ValueError(f"Reach scene XML missing sites/bodies {missing}: {self.xml_path}")
             if self.sword_body_pos is not None:
-                self.model.body_pos[self._sword_body_id] = np.asarray(
-                    self.sword_body_pos, dtype=np.float64
-                )
+                self.model.body_pos[self._sword_body_id] = np.asarray(self.sword_body_pos, dtype=np.float64)
             if self.sword_body_quat is not None:
-                self.model.body_quat[self._sword_body_id] = np.asarray(
-                    self.sword_body_quat, dtype=np.float64
-                )
+                self.model.body_quat[self._sword_body_id] = np.asarray(self.sword_body_quat, dtype=np.float64)
             if self.shield_body_pos is not None:
-                self.model.body_pos[self._shield_body_id] = np.asarray(
-                    self.shield_body_pos, dtype=np.float64
-                )
+                self.model.body_pos[self._shield_body_id] = np.asarray(self.shield_body_pos, dtype=np.float64)
             if self.shield_body_quat is not None:
                 self.model.body_quat[self._shield_body_id] = np.asarray(
                     self.shield_body_quat, dtype=np.float64
@@ -284,24 +265,16 @@ class UnoarmEnv(gym.Env):
         self._peg_fall_steps = 0
         self._peg_fall_xy = (0.0, 0.0)  # frozen XY during fall
         if self.scene == SCENE_TABLE_PLACE:
-            self._tcp_site_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, REACH_TCP_SITE)
-            )
-            self._left_tcp_site_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "left_tcp")
-            )
-            self._peg_body_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "peg")
-            )
+            self._tcp_site_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, REACH_TCP_SITE))
+            self._left_tcp_site_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "left_tcp"))
+            self._peg_body_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "peg"))
             self._peg_grasp_site_id = int(
                 mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "peg_grasp")
             )
             self._target_circle_site_id = int(
                 mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_circle")
             )
-            self._peg_geom_id = int(
-                mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "peg_geom")
-            )
+            self._peg_geom_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "peg_geom"))
             # Right-gripper main finger meshes define the real grasp center
             # (geom midpoint) and the surface-contact check.
             left_bodies = (
@@ -349,13 +322,9 @@ class UnoarmEnv(gym.Env):
                 if sid < 0
             ]
             if missing:
-                raise ValueError(
-                    f"Table-place scene XML missing sites/bodies {missing}: {self.xml_path}"
-                )
+                raise ValueError(f"Table-place scene XML missing sites/bodies {missing}: {self.xml_path}")
             self.place_peg_xy(self.peg_xy)
-            self._peg_home_pos = np.asarray(
-                self.model.body_pos[self._peg_body_id], dtype=np.float64
-            ).copy()
+            self._peg_home_pos = np.asarray(self.model.body_pos[self._peg_body_id], dtype=np.float64).copy()
 
         self._sword_attached = False
         self._shield_attached = False
@@ -417,7 +386,9 @@ class UnoarmEnv(gym.Env):
         return np.clip(normalized, -1.0, 1.0).astype(np.float32)
 
     def _current_control_qpos(self) -> np.ndarray:
-        return np.asarray([self.data.qpos[self._qpos_addr[name]] for name in CONTROL_JOINTS], dtype=np.float32)
+        return np.asarray(
+            [self.data.qpos[self._qpos_addr[name]] for name in CONTROL_JOINTS], dtype=np.float32
+        )
 
     def _apply_mimics(self) -> None:
         for mimic_name, (source_name, multiplier, offset) in MIMIC_JOINTS.items():
@@ -496,9 +467,7 @@ class UnoarmEnv(gym.Env):
     def _left_gripper_closed(self) -> bool:
         return self._gripper_closed(LEFT_GRIPPER_INDEX)
 
-    def _set_body_pose_world(
-        self, body_id: int, body_pos: np.ndarray, body_quat_wxyz: np.ndarray
-    ) -> None:
+    def _set_body_pose_world(self, body_id: int, body_pos: np.ndarray, body_quat_wxyz: np.ndarray) -> None:
         if body_id < 0:
             return
         self.model.body_pos[body_id] = np.asarray(body_pos, dtype=np.float64).reshape(3)
@@ -665,9 +634,7 @@ class UnoarmEnv(gym.Env):
             self.model.body_pos[self._peg_body_id] = np.array(
                 [self._peg_fall_xy[0], self._peg_fall_xy[1], rest_z], dtype=np.float64
             )
-            self.model.body_quat[self._peg_body_id] = np.array(
-                [1.0, 0.0, 0.0, 0.0], dtype=np.float64
-            )
+            self.model.body_quat[self._peg_body_id] = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
         else:
             self.model.body_pos[self._peg_body_id, 2] = new_z
         self._peg_fall_steps += 1
@@ -732,18 +699,10 @@ class UnoarmEnv(gym.Env):
 
     def _peg_between_fingers(self) -> bool:
         """True when the peg center lies between the two main finger mesh frames."""
-        if (
-            self._peg_body_id < 0
-            or self._rg_left_finger_geom_id < 0
-            or self._rg_right_finger_geom_id < 0
-        ):
+        if self._peg_body_id < 0 or self._rg_left_finger_geom_id < 0 or self._rg_right_finger_geom_id < 0:
             return False
-        left = np.asarray(
-            self.data.geom_xpos[self._rg_left_finger_geom_id], dtype=np.float64
-        )
-        right = np.asarray(
-            self.data.geom_xpos[self._rg_right_finger_geom_id], dtype=np.float64
-        )
+        left = np.asarray(self.data.geom_xpos[self._rg_left_finger_geom_id], dtype=np.float64)
+        right = np.asarray(self.data.geom_xpos[self._rg_right_finger_geom_id], dtype=np.float64)
         peg = np.asarray(self.model.body_pos[self._peg_body_id], dtype=np.float64)
         axis = right - left
         span2 = float(np.dot(axis, axis))
@@ -768,19 +727,13 @@ class UnoarmEnv(gym.Env):
         if not self._peg_attached:
             # Lock the relative position at the instant of grasping.
             pc = self._peg_center_world()
-            self._peg_grasp_offset = (
-                np.asarray(pc, dtype=np.float64) - np.asarray(gc, dtype=np.float64)
-            )
+            self._peg_grasp_offset = np.asarray(pc, dtype=np.float64) - np.asarray(gc, dtype=np.float64)
             self._peg_attach_R_rel = np.eye(3, dtype=np.float64)
             self._peg_attached = True
             # Freeze jaw aperture here — further close commands are ignored.
             self._peg_attach_gripper_norm = self._gripper_normalized(RIGHT_GRIPPER_INDEX)
-        self.model.body_pos[self._peg_body_id] = (
-            np.asarray(gc, dtype=np.float64) + self._peg_grasp_offset
-        )
-        self.model.body_quat[self._peg_body_id] = np.array(
-            [1.0, 0.0, 0.0, 0.0], dtype=np.float64
-        )
+        self.model.body_pos[self._peg_body_id] = np.asarray(gc, dtype=np.float64) + self._peg_grasp_offset
+        self.model.body_quat[self._peg_body_id] = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
         mujoco.mj_forward(self.model, self.data)
 
     def _fingers_bracket_peg(self) -> bool:
@@ -867,11 +820,7 @@ class UnoarmEnv(gym.Env):
         if self._sword_body_id >= 0 and self._sword_home_pos is not None and not self._sword_attached:
             self.model.body_pos[self._sword_body_id] = self._sword_home_pos
             self.model.body_quat[self._sword_body_id] = self._sword_home_quat
-        if (
-            self._shield_body_id >= 0
-            and self._shield_home_pos is not None
-            and not self._shield_attached
-        ):
+        if self._shield_body_id >= 0 and self._shield_home_pos is not None and not self._shield_attached:
             self.model.body_pos[self._shield_body_id] = self._shield_home_pos
             self.model.body_quat[self._shield_body_id] = self._shield_home_quat
         self._apply_prop_presence(forward=True)
@@ -891,9 +840,7 @@ class UnoarmEnv(gym.Env):
     def _ensure_renderer(self) -> None:
         """Lazily create the MuJoCo renderer on first use."""
         if self._renderer is None:
-            self._renderer = mujoco.Renderer(
-                self.model, height=self.obs_height, width=self.obs_width
-            )
+            self._renderer = mujoco.Renderer(self.model, height=self.obs_height, width=self.obs_width)
 
     def _get_obs(self) -> dict[str, Any]:
         self._ensure_renderer()
@@ -950,15 +897,9 @@ class UnoarmEnv(gym.Env):
         right_tcp = np.asarray(self.data.site_xpos[self._tcp_site_id], dtype=np.float64)
         left_tcp = np.asarray(self.data.site_xpos[self._left_tcp_site_id], dtype=np.float64)
         sword_handle = np.asarray(self.data.site_xpos[self._handle_site_id], dtype=np.float64)
-        shield_handle = np.asarray(
-            self.data.site_xpos[self._shield_handle_site_id], dtype=np.float64
-        )
-        right_dist, right_ok = evaluate_reach(
-            right_tcp, sword_handle, self.reach_success_threshold
-        )
-        left_dist, left_ok = evaluate_reach(
-            left_tcp, shield_handle, self.reach_success_threshold
-        )
+        shield_handle = np.asarray(self.data.site_xpos[self._shield_handle_site_id], dtype=np.float64)
+        right_dist, right_ok = evaluate_reach(right_tcp, sword_handle, self.reach_success_threshold)
+        left_dist, left_ok = evaluate_reach(left_tcp, shield_handle, self.reach_success_threshold)
         right_attached = bool(self._sword_attached) and not self.remove_sword
         left_attached = bool(self._shield_attached) and not self.remove_shield
         both = left_attached and right_attached
@@ -970,9 +911,7 @@ class UnoarmEnv(gym.Env):
         exec_now = False
         if exec_enabled:
             exec_pos = np.asarray(self.execution_point_pos, dtype=np.float64).reshape(3)
-            exec_dist, exec_now = evaluate_reach(
-                sword_handle, exec_pos, self.reach_success_threshold
-            )
+            exec_dist, exec_now = evaluate_reach(sword_handle, exec_pos, self.reach_success_threshold)
             # Pass-through: once the grasped sword handle enters the radius, latch success.
             if right_attached and exec_now:
                 self._execution_point_passed = True
@@ -1106,9 +1045,7 @@ class UnoarmEnv(gym.Env):
                 raw = options["peg_xy"]
                 peg_xy = (float(raw[0]), float(raw[1]))
             self.place_peg_xy(peg_xy)
-            self._peg_home_pos = np.asarray(
-                self.model.body_pos[self._peg_body_id], dtype=np.float64
-            ).copy()
+            self._peg_home_pos = np.asarray(self.model.body_pos[self._peg_body_id], dtype=np.float64).copy()
 
         start = np.asarray(START_POSE, dtype=np.float32)
         if options is not None and "state" in options:

@@ -160,9 +160,7 @@ def resolve_shield_pose(
     yaw, pitch, roll = (0.0, 0.0, 0.0) if euler_deg is None else tuple(float(x) for x in euler_deg)
     quat = shield_quat_from_euler_deg(yaw, pitch, roll)
     if handle_pos is None:
-        handle = handle_world_from_body(
-            HELMET_BODY_POS, HELMET_BODY_QUAT, handle_local=HELMET_HANDLE_LOCAL
-        )
+        handle = handle_world_from_body(HELMET_BODY_POS, HELMET_BODY_QUAT, handle_local=HELMET_HANDLE_LOCAL)
     else:
         handle = tuple(float(x) for x in handle_pos)  # type: ignore[assignment]
         if len(handle) != 3:
@@ -174,11 +172,7 @@ def resolve_shield_pose(
 
 
 def default_shield_handle_pos() -> list[float]:
-    return list(
-        handle_world_from_body(
-            HELMET_BODY_POS, HELMET_BODY_QUAT, handle_local=HELMET_HANDLE_LOCAL
-        )
-    )
+    return list(handle_world_from_body(HELMET_BODY_POS, HELMET_BODY_QUAT, handle_local=HELMET_HANDLE_LOCAL))
 
 
 def default_shield_euler_deg() -> list[float]:

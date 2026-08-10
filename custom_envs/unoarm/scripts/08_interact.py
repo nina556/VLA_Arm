@@ -34,10 +34,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lerobot.policies import make_pre_post_processors  # noqa: E402
-from lerobot.policies.act import ACTPolicy  # noqa: E402
-from lerobot.policies.utils import build_inference_frame  # noqa: E402
-
 from gym_unoarm.constants import FPS, JOINTS  # noqa: E402
 from gym_unoarm.env import (  # noqa: E402
     UnoarmEnv,
@@ -45,9 +41,11 @@ from gym_unoarm.env import (  # noqa: E402
     configure_viewer_theme,
 )
 
-DEFAULT_CHECKPOINT = (
-    ROOT.parent.parent / "data" / "outputs" / "mutiTask" / "10000步权重" / "pretrained_model"
-)
+from lerobot.policies import make_pre_post_processors  # noqa: E402
+from lerobot.policies.act import ACTPolicy  # noqa: E402
+from lerobot.policies.utils import build_inference_frame  # noqa: E402
+
+DEFAULT_CHECKPOINT = ROOT.parent.parent / "data" / "outputs" / "mutiTask" / "10000步权重" / "pretrained_model"
 RAW_ZERO = np.zeros(16, dtype=np.float32)
 STATE_LABELS = (
     "L1",

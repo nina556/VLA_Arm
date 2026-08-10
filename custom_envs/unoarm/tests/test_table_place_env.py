@@ -199,7 +199,7 @@ def test_table_place_no_grasp_when_fingers_miss_peg():
     env = UnoarmEnv(scene=SCENE_TABLE_PLACE)
     env.reset()
     peg_id = env._peg_body_id
-    half = float(env._peg_grasp_local[2])
+    float(env._peg_grasp_local[2])
 
     # Park the peg on its home spot (resting on the table), far from the fingers.
     env.place_peg_xy(env.peg_xy)
@@ -282,9 +282,7 @@ def test_peg_fall_lands_on_table():
     half = float(PEG_HALF_HEIGHT)
     drop_xy = (0.05, -0.40)  # arbitrary point above the table
     start_z = table_place_top_z() + half + 0.15  # 15 cm above rest
-    env.model.body_pos[peg_id] = np.array(
-        [drop_xy[0], drop_xy[1], start_z], dtype=np.float64
-    )
+    env.model.body_pos[peg_id] = np.array([drop_xy[0], drop_xy[1], start_z], dtype=np.float64)
     env.model.body_quat[peg_id] = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
     mujoco.mj_forward(env.model, env.data)
 

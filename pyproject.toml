@@ -413,6 +413,13 @@ ignore = [
 "__init__.py" = ["F401", "F403", "E402"]
 # E402: conditional-import guards (TYPE_CHECKING / is_package_available) must precede the imports they protect
 "src/lerobot/scripts/convert_dataset_v21_to_v30.py" = ["E402"]
+"custom_envs/unoarm/data_gen/reach_ik.py" = ["SIM102"]
+"custom_envs/unoarm/data_gen/table_place_ik.py" = ["N806", "SIM102", "SIM113"]
+"custom_envs/unoarm/gym_unoarm/env.py" = ["SIM108"]
+"custom_envs/unoarm/gym_unoarm/ik.py" = ["N806"]
+"custom_envs/unoarm/tests/test_ik.py" = ["E402", "N806"]
+"custom_envs/unoarm/tests/test_reach_ik_datagen.py" = ["E402"]
+"eval_smolvla.py" = ["E402"]
 [tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["lerobot"]
@@ -454,6 +461,9 @@ default.extend-ignore-identifiers-re = [
     "OT_VALUE",
     "VanderBilt",
     "seperated_timestep",
+    "metalness",
+    "muti",
+    "thr",
 ]
 
 # TODO: Uncomment when ready to use

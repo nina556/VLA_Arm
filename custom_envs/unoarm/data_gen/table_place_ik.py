@@ -18,7 +18,6 @@ from typing import Any, Literal
 
 import mujoco
 import numpy as np
-
 from gym_unoarm.constants import (
     FPS,
     GRIPPER_CLOSE,
@@ -169,9 +168,7 @@ def _jaw_separation_unit(env) -> np.ndarray | None:
     return sep / n
 
 
-def tcp_orientation_matches(
-    env, mode: GraspOrientation, *, cos_tol: float = 0.85
-) -> bool:
+def tcp_orientation_matches(env, mode: GraspOrientation, *, cos_tol: float = 0.85) -> bool:
     """True when TCP pose matches the mode and jaws open horizontally.
 
     - ``vertical``: TCP +X points down; approach from above.
@@ -182,9 +179,7 @@ def tcp_orientation_matches(
     """
     if int(getattr(env, "_tcp_site_id", -1)) < 0:
         return False
-    x = np.asarray(env.data.site_xmat[env._tcp_site_id], dtype=np.float64).reshape(3, 3)[
-        :, 0
-    ]
+    x = np.asarray(env.data.site_xmat[env._tcp_site_id], dtype=np.float64).reshape(3, 3)[:, 0]
     x = x / (np.linalg.norm(x) + 1e-12)
     if mode == GRASP_ORI_VERTICAL:
         if float(-x[2]) < float(cos_tol):
@@ -252,9 +247,7 @@ def _is_pregrasp_peg_collision_body(body_name: str) -> bool:
     if body_name.startswith("Right_Link"):
         return body_name != "Right_Link7"
     # Gripper support / base (not pads) should also not bat the peg.
-    if "Gripper" in body_name and not _is_right_finger_pad_body(body_name):
-        return True
-    return False
+    return bool("Gripper" in body_name and not _is_right_finger_pad_body(body_name))
 
 
 def arm_links_clear_peg(
@@ -292,9 +285,7 @@ def arm_links_clear_peg(
     return True
 
 
-def _pregrasp_arm_peg_index_range(
-    n_poses: int, segment_steps: int, hold_steps: int
-) -> tuple[int, int]:
+def _pregrasp_arm_peg_index_range(n_poses: int, segment_steps: int, hold_steps: int) -> tuple[int, int]:
     """Steps before grasp_close where arm links must clear the peg.
 
     Pose layout: approach(0), pregrasp(1), grasp_close(2), ...
@@ -306,9 +297,7 @@ def _pregrasp_arm_peg_index_range(
     return 0, ends[min(1, len(ends) - 1)]
 
 
-def _geom_origin_in_aabb(
-    env, gid: int, center: np.ndarray, half: np.ndarray
-) -> bool:
+def _geom_origin_in_aabb(env, gid: int, center: np.ndarray, half: np.ndarray) -> bool:
     """True when the geom frame origin lies inside the AABB."""
     xpos = np.asarray(env.data.geom_xpos[int(gid)], dtype=np.float64)
     return bool(np.all(np.abs(xpos - center) <= half + 1e-9))
@@ -370,9 +359,7 @@ def _arm_strict_index_range(n_poses: int, segment_steps: int, hold_steps: int) -
     return ends[3], ends[-2] if len(ends) >= 2 else ends[-1]
 
 
-def _default_z_range(
-    table_clearance_m: float, *, low_extra: float, high_extra: float
-) -> tuple[float, float]:
+def _default_z_range(table_clearance_m: float, *, low_extra: float, high_extra: float) -> tuple[float, float]:
     floor = table_place_top_z() + float(PEG_HALF_HEIGHT) + float(table_clearance_m)
     return (floor + float(low_extra), floor + float(high_extra))
 
@@ -412,11 +399,7 @@ def sample_table_place_ik_params(
         place_hi = place_lo
     ori: GraspOrientation
     if grasp_orientation is None:
-        ori = (
-            GRASP_ORI_VERTICAL
-            if float(rng.random()) < _GRASP_ORI_VERTICAL_PROB
-            else GRASP_ORI_HORIZONTAL
-        )
+        ori = GRASP_ORI_VERTICAL if float(rng.random()) < _GRASP_ORI_VERTICAL_PROB else GRASP_ORI_HORIZONTAL
     else:
         ori = grasp_orientation
     return TablePlaceIkParams(
@@ -551,9 +534,7 @@ def _copy_right_gripper(src: np.ndarray, dst: np.ndarray) -> np.ndarray:
     return out
 
 
-def _close_gripper_until_grasp(
-    env, q_arm: np.ndarray, *, n_steps: int = 28
-) -> np.ndarray | None:
+def _close_gripper_until_grasp(env, q_arm: np.ndarray, *, n_steps: int = 28) -> np.ndarray | None:
     """Close the right gripper from open until attach; return that raw pose.
 
     Stops at the first successful grasp instead of commanding full ``GRIPPER_CLOSE``.
@@ -618,14 +599,10 @@ def _solve_tcp(
     for _ in range(int(TABLE_PLACE_IK_MAX_ITERS)):
         mujoco.mj_forward(env.model, env.data)
         tcp = np.asarray(env.data.site_xpos[env._tcp_site_id], dtype=np.float64)
-        r_cur = np.asarray(env.data.site_xmat[env._tcp_site_id], dtype=np.float64).reshape(
-            3, 3
-        )
+        r_cur = np.asarray(env.data.site_xmat[env._tcp_site_id], dtype=np.float64).reshape(3, 3)
         pos_e = pos - tcp
         # Align +X and +Z axes via cross-product angular error.
-        ori_e = np.cross(r_cur[:, 0], r_tgt[:, 0]) + 0.5 * np.cross(
-            r_cur[:, 2], r_tgt[:, 2]
-        )
+        ori_e = np.cross(r_cur[:, 0], r_tgt[:, 0]) + 0.5 * np.cross(r_cur[:, 2], r_tgt[:, 2])
         x_dot = float(np.dot(r_cur[:, 0], r_tgt[:, 0]))
         if float(np.linalg.norm(pos_e)) < TABLE_PLACE_IK_POS_TOL and x_dot >= cos_tol:
             return env._current_control_qpos().astype(np.float32).copy()
@@ -682,9 +659,7 @@ def _align_grasp_center_to_peg(
         target = tcp + step * err_vec
         q_next = _solve_tcp(env, target, target_rot=target_rot, ori_tol=TABLE_PLACE_IK_ORI_TOL)
         if q_next is None:
-            q_next = _solve_tcp(
-                env, target, target_rot=target_rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL
-            )
+            q_next = _solve_tcp(env, target, target_rot=target_rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL)
         if q_next is None:
             q_next = solve_right_tcp_ik(
                 env,
@@ -708,9 +683,7 @@ def _align_grasp_center_to_peg(
     return None
 
 
-def _approach_tcp_target(
-    peg: np.ndarray, params: TablePlaceIkParams
-) -> np.ndarray:
+def _approach_tcp_target(peg: np.ndarray, params: TablePlaceIkParams) -> np.ndarray:
     """Approach TCP position for the selected grasp orientation."""
     off = float(params.approach_offset_y)
     if params.grasp_orientation == GRASP_ORI_VERTICAL:
@@ -720,9 +693,7 @@ def _approach_tcp_target(
     return peg + np.array([0.0, max(min(off, 0.08), 0.04), 0.03], dtype=np.float64)
 
 
-def _approach_tcp_candidates(
-    peg: np.ndarray, params: TablePlaceIkParams
-) -> list[np.ndarray]:
+def _approach_tcp_candidates(peg: np.ndarray, params: TablePlaceIkParams) -> list[np.ndarray]:
     """Primary approach plus a few fallback seeds."""
     primary = _approach_tcp_target(peg, params)
     out = [primary]
@@ -776,7 +747,7 @@ def build_table_place_ik_poses(
     circle_xy = np.asarray(TABLE_CIRCLE_CENTER_XY, dtype=np.float64)
     rot = grasp_orientation_rot_mat(params.grasp_orientation)
 
-    approach_pos = _approach_tcp_target(peg, params)
+    _approach_tcp_target(peg, params)
     q_approach = None
     for cand in _approach_tcp_candidates(peg, params):
         q_approach = _solve_tcp(env, cand, target_rot=rot)
@@ -785,12 +756,9 @@ def build_table_place_ik_poses(
         env.apply_raw_qpos(_with_right_gripper(env, q_approach, open_=True))
         if (
             tcp_orientation_matches(env, params.grasp_orientation)
-            and arm_clears_table_collision_box(
-                env, margin_m=table_box_margin_m, require_aabb=False
-            )
+            and arm_clears_table_collision_box(env, margin_m=table_box_margin_m, require_aabb=False)
             and arm_links_clear_peg(env)
         ):
-            approach_pos = cand
             break
         q_approach = None
     if q_approach is None:
@@ -798,9 +766,7 @@ def build_table_place_ik_poses(
     env.apply_raw_qpos(_with_right_gripper(env, q_approach, open_=True))
     if not tcp_orientation_matches(env, params.grasp_orientation):
         return None
-    if not arm_clears_table_collision_box(
-        env, margin_m=table_box_margin_m, require_aabb=False
-    ):
+    if not arm_clears_table_collision_box(env, margin_m=table_box_margin_m, require_aabb=False):
         return None
     if not arm_links_clear_peg(env):
         return None
@@ -824,9 +790,7 @@ def build_table_place_ik_poses(
 
     offset = grasp_center_tcp_offset(env)
     lift_tcp = np.array([peg[0], peg[1], float(params.lift_z)], dtype=np.float64) - offset
-    q_lift = _solve_tcp(
-        env, lift_tcp, target_rot=rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL
-    )
+    q_lift = _solve_tcp(env, lift_tcp, target_rot=rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL)
     if q_lift is None:
         # Climb in small Z hops from the grasp TCP while keeping orientation.
         tcp = np.asarray(env.data.site_xpos[env._tcp_site_id], dtype=np.float64)
@@ -839,9 +803,7 @@ def build_table_place_ik_poses(
             cur = cur.copy()
             cur[2] = min(target_z, float(cur[2]) + 0.025)
             cur[0], cur[1] = float(lift_tcp[0]), float(lift_tcp[1])
-            q_hop = _solve_tcp(
-                env, cur, target_rot=rot, ori_tol=max(TABLE_PLACE_LIFT_ORI_TOL, 1.0)
-            )
+            q_hop = _solve_tcp(env, cur, target_rot=rot, ori_tol=max(TABLE_PLACE_LIFT_ORI_TOL, 1.0))
             if q_hop is None:
                 # Position-primary fallback for this hop.
                 q_hop = solve_right_tcp_ik(
@@ -856,18 +818,17 @@ def build_table_place_ik_poses(
                 break
             q_lift = q_hop
             env.apply_raw_qpos(_copy_right_gripper(grasp_close, q_hop))
-        if q_lift is not None and float(
-            np.asarray(env.data.site_xpos[env._tcp_site_id], dtype=np.float64)[2]
-        ) < target_z - 0.04:
+        if (
+            q_lift is not None
+            and float(np.asarray(env.data.site_xpos[env._tcp_site_id], dtype=np.float64)[2]) < target_z - 0.04
+        ):
             # Did not climb high enough — treat as failure.
             q_lift = None
     if q_lift is None:
         return None
     lift_close = clip_raw_pose(env, _copy_right_gripper(grasp_close, q_lift))
     env.apply_raw_qpos(lift_close)
-    if not arm_clears_table_collision_box(
-        env, margin_m=table_box_margin_m, require_aabb=True
-    ):
+    if not arm_clears_table_collision_box(env, margin_m=table_box_margin_m, require_aabb=True):
         return None
     if not peg_bottom_clears_table(env, DEFAULT_TABLE_CLEARANCE_M):
         return None
@@ -904,9 +865,7 @@ def build_table_place_ik_poses(
         target_gc = peg_now + err_xy
         target_gc[2] = transport_z
         target_tcp = target_gc - offset_now
-        q_tp = _solve_tcp(
-            env, target_tcp, target_rot=rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL
-        )
+        q_tp = _solve_tcp(env, target_tcp, target_rot=rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL)
         if q_tp is None:
             q_tp = _solve_tcp(
                 env,
@@ -922,9 +881,7 @@ def build_table_place_ik_poses(
             break
         last_q = cand
         env.apply_raw_qpos(last_q)
-        if not arm_clears_table_collision_box(
-            env, margin_m=table_box_margin_m, require_aabb=True
-        ):
+        if not arm_clears_table_collision_box(env, margin_m=table_box_margin_m, require_aabb=True):
             return None
         _append_pose(poses, last_q)
         n_transport += 1
@@ -935,15 +892,11 @@ def build_table_place_ik_poses(
     lower_gc = np.array([goal_xy[0], goal_xy[1], place_z], dtype=np.float64)
     if float(np.linalg.norm(peg_now[:2] - goal_xy)) < 0.04:
         lower_gc[0], lower_gc[1] = float(peg_now[0]), float(peg_now[1])
-    q_lower = _solve_tcp(
-        env, lower_gc - offset_now, target_rot=rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL
-    )
+    q_lower = _solve_tcp(env, lower_gc - offset_now, target_rot=rot, ori_tol=TABLE_PLACE_LIFT_ORI_TOL)
     if q_lower is not None:
         lower_close = clip_raw_pose(env, _copy_right_gripper(grasp_close, q_lower))
         env.apply_raw_qpos(lower_close)
-        if arm_clears_table_collision_box(
-            env, margin_m=table_box_margin_m, require_aabb=True
-        ):
+        if arm_clears_table_collision_box(env, margin_m=table_box_margin_m, require_aabb=True):
             last_q = lower_close
             _append_pose(poses, last_q)
 
@@ -955,9 +908,7 @@ def build_table_place_ik_poses(
     return poses
 
 
-def resolve_episode_peg_xy(
-    config: TablePlaceIkGenConfig, rng: np.random.Generator
-) -> tuple[float, float]:
+def resolve_episode_peg_xy(config: TablePlaceIkGenConfig, rng: np.random.Generator) -> tuple[float, float]:
     """Pick peg XY for one attempt: sampled or fixed, always clipped to workspace."""
     xr = config.peg_workspace_x_range
     yr = config.peg_workspace_y_range
@@ -972,9 +923,7 @@ def resolve_episode_peg_xy(
             min_dist_from_circle=min_d,
         )
     raw = config.peg_xy_fixed if config.peg_xy_fixed is not None else PEG_DEFAULT_XY
-    clipped = clip_peg_xy_to_workspace(
-        raw, edge_margin=margin, x_range=xr, y_range=yr
-    )
+    clipped = clip_peg_xy_to_workspace(raw, edge_margin=margin, x_range=xr, y_range=yr)
     if not is_peg_xy_in_workspace(
         clipped,
         edge_margin=margin,
@@ -1017,10 +966,7 @@ def table_place_ik_config_from_params(
     out_name_repo = repo_id or str(params.get("repo_id") or "doki/unoarm_table_place_ik")
     max_attempts = params.get("max_attempts")
     sample_peg = params.get("sample_peg_xy")
-    if sample_peg is None:
-        sample_peg = True
-    else:
-        sample_peg = bool(sample_peg)
+    sample_peg = True if sample_peg is None else bool(sample_peg)
     peg_fixed = params.get("peg_xy")
     peg_xy_fixed: tuple[float, float] | None = None
     if peg_fixed is not None and len(peg_fixed) >= 2:
@@ -1034,9 +980,7 @@ def table_place_ik_config_from_params(
         lift_z_range=_pair("lift_z_min", "lift_z_max", default_lift),
         place_z_range=_pair("place_z_min", "place_z_max", default_place),
         table_clearance_m=clearance,
-        table_box_margin_m=float(
-            params.get("table_box_margin_m", DEFAULT_TABLE_BOX_MARGIN_M)
-        ),
+        table_box_margin_m=float(params.get("table_box_margin_m", DEFAULT_TABLE_BOX_MARGIN_M)),
         pose_jitter_std=float(params.get("pose_jitter_std", 0.0)),
         seed=int(params.get("seed", 0)),
         ik_retries=int(params.get("ik_retries", DEFAULT_IK_RETRIES)),
@@ -1049,23 +993,13 @@ def table_place_ik_config_from_params(
         task=str(params.get("task") or TASK_TABLE_PLACE),
         sample_peg_xy=sample_peg,
         peg_xy_fixed=peg_xy_fixed,
-        peg_workspace_x_range=_pair(
-            "peg_x_min", "peg_x_max", PEG_WORKSPACE_X_RANGE
-        ),
-        peg_workspace_y_range=_pair(
-            "peg_y_min", "peg_y_max", PEG_WORKSPACE_Y_RANGE
-        ),
-        peg_edge_margin=float(
-            params.get("peg_edge_margin", PEG_SAMPLE_EDGE_MARGIN)
-        ),
-        peg_min_dist_from_circle=float(
-            params.get("peg_min_dist_from_circle", PEG_MIN_DIST_FROM_CIRCLE)
-        ),
+        peg_workspace_x_range=_pair("peg_x_min", "peg_x_max", PEG_WORKSPACE_X_RANGE),
+        peg_workspace_y_range=_pair("peg_y_min", "peg_y_max", PEG_WORKSPACE_Y_RANGE),
+        peg_edge_margin=float(params.get("peg_edge_margin", PEG_SAMPLE_EDGE_MARGIN)),
+        peg_min_dist_from_circle=float(params.get("peg_min_dist_from_circle", PEG_MIN_DIST_FROM_CIRCLE)),
         episodes_per_peg=int(params.get("episodes_per_peg", 2)),
         max_attempts_per_peg=(
-            int(params["max_attempts_per_peg"])
-            if params.get("max_attempts_per_peg") is not None
-            else None
+            int(params["max_attempts_per_peg"]) if params.get("max_attempts_per_peg") is not None else None
         ),
     )
 
@@ -1078,9 +1012,7 @@ def load_table_place_ik_meta(root: Path) -> dict[str, Any] | None:
     return raw if isinstance(raw, dict) else None
 
 
-def episode_peg_xy_from_meta(
-    meta: dict[str, Any] | None, episode_index: int
-) -> tuple[float, float] | None:
+def episode_peg_xy_from_meta(meta: dict[str, Any] | None, episode_index: int) -> tuple[float, float] | None:
     """Return peg XY recorded for ``episode_index`` (or legacy top-level peg_xy)."""
     if not isinstance(meta, dict):
         return None
@@ -1098,9 +1030,7 @@ def episode_peg_xy_from_meta(
     return None
 
 
-def generate_table_place_ik_dataset(
-    config: TablePlaceIkGenConfig, *, log: LogFn = print
-) -> Path:
+def generate_table_place_ik_dataset(config: TablePlaceIkGenConfig, *, log: LogFn = print) -> Path:
     """Generate a LeRobot dataset of successful table-place pick-and-place episodes."""
     if config.num_episodes < 1:
         raise ValueError(f"num_episodes must be >= 1, got {config.num_episodes}")
@@ -1109,15 +1039,11 @@ def generate_table_place_ik_dataset(
     if config.table_clearance_m < 0.0:
         raise ValueError(f"table_clearance_m must be >= 0, got {config.table_clearance_m}")
     if config.table_box_margin_m < 0.0:
-        raise ValueError(
-            f"table_box_margin_m must be >= 0, got {config.table_box_margin_m}"
-        )
+        raise ValueError(f"table_box_margin_m must be >= 0, got {config.table_box_margin_m}")
     if config.peg_edge_margin < 0.0:
         raise ValueError(f"peg_edge_margin must be >= 0, got {config.peg_edge_margin}")
     if int(config.episodes_per_peg) < 1:
-        raise ValueError(
-            f"episodes_per_peg must be >= 1, got {config.episodes_per_peg}"
-        )
+        raise ValueError(f"episodes_per_peg must be >= 1, got {config.episodes_per_peg}")
     # Validate workspace intersection is non-empty before long generate loops.
     peg_workspace_xy_bounds(
         edge_margin=config.peg_edge_margin,
@@ -1139,16 +1065,13 @@ def generate_table_place_ik_dataset(
     )
 
     output_root = Path(
-        config.output_root
-        or (Path(__file__).resolve().parents[1] / "data" / "unoarm_table_place_ik")
+        config.output_root or (Path(__file__).resolve().parents[1] / "data" / "unoarm_table_place_ik")
     )
     if config.append and config.overwrite:
         raise ValueError("append and overwrite cannot both be True")
     if config.append:
         if not output_root.is_dir():
-            raise FileNotFoundError(
-                f"append=True but dataset root does not exist: {output_root}"
-            )
+            raise FileNotFoundError(f"append=True but dataset root does not exist: {output_root}")
         if not (output_root / "meta" / "info.json").is_file():
             raise FileNotFoundError(
                 f"append=True but {output_root} is not a LeRobot dataset (missing meta/info.json)"
@@ -1163,6 +1086,7 @@ def generate_table_place_ik_dataset(
         shutil.rmtree(output_root)
 
     from gym_unoarm.env import UnoarmEnv
+
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     existing_meta = load_table_place_ik_meta(output_root) if config.append else None
@@ -1266,9 +1190,7 @@ def generate_table_place_ik_dataset(
                     for _ in range(max(1, int(config.ik_retries))):
                         env.reset(options=reset_opts)
                         home_q = env._current_control_qpos().astype(np.float32).copy()
-                        poses = build_table_place_ik_poses(
-                            env, params, table_box_margin_m=box_margin
-                        )
+                        poses = build_table_place_ik_poses(env, params, table_box_margin_m=box_margin)
                         if poses is not None:
                             break
                     if poses is not None:
@@ -1285,9 +1207,7 @@ def generate_table_place_ik_dataset(
                 env.reset(options=reset_opts)
                 start_q = home_q.copy()
                 if config.pose_jitter_std > 0.0:
-                    jitter = rng.normal(0.0, config.pose_jitter_std, size=16).astype(
-                        np.float32
-                    )
+                    jitter = rng.normal(0.0, config.pose_jitter_std, size=16).astype(np.float32)
                     jitter[RIGHT_GRIPPER_INDEX] = 0.0
                     jitter[7] = 0.0
                     ep_poses = [clip_raw_pose(env, pose + jitter) for pose in poses]
@@ -1328,18 +1248,13 @@ def generate_table_place_ik_dataset(
                     action = env._normalize(clip_raw_pose(env, raw_action))
                     obs, _reward, _terminated, _truncated, last_info = env.step(action)
                     if not warned_black and images_are_black(obs):
-                        log(
-                            "warning: rendered images are all black; "
-                            "check MuJoCo offscreen rendering."
-                        )
+                        log("warning: rendered images are all black; check MuJoCo offscreen rendering.")
                         warned_black = True
                     frame_buf.append((obs, action.copy()))
                     if bool(last_info.get("peg_attached", False)):
                         saw_attach = True
                     strict = arm_lo <= step_i < arm_hi
-                    if not arm_clears_table_collision_box(
-                        env, margin_m=box_margin, require_aabb=strict
-                    ):
+                    if not arm_clears_table_collision_box(env, margin_m=box_margin, require_aabb=strict):
                         arm_ok = False
                     if pre_lo <= step_i < pre_hi and not arm_links_clear_peg(env):
                         arm_peg_ok = False
@@ -1351,14 +1266,7 @@ def generate_table_place_ik_dataset(
 
                 success = bool(last_info.get("success", False))
                 falling = bool(last_info.get("peg_falling", False))
-                keep = (
-                    saw_attach
-                    and clearance_ok
-                    and arm_ok
-                    and arm_peg_ok
-                    and success
-                    and not falling
-                )
+                keep = saw_attach and clearance_ok and arm_ok and arm_peg_ok and success and not falling
                 if not keep:
                     skipped += 1
                     log(
@@ -1403,10 +1311,7 @@ def generate_table_place_ik_dataset(
                     f"({len(frame_buf)} frames) peg_xy={peg_xy} params={params}"
                 )
             if peg_written < episodes_per_peg and written < config.num_episodes:
-                log(
-                    f"abandon peg_xy={peg_xy}: got {peg_written}/{episodes_per_peg} "
-                    f"after {peg_tries} tries"
-                )
+                log(f"abandon peg_xy={peg_xy}: got {peg_written}/{episodes_per_peg} after {peg_tries} tries")
     finally:
         dataset.finalize()
         env.close()
@@ -1451,9 +1356,7 @@ def generate_table_place_ik_dataset(
         "episodes": base_episode_metas + episode_metas,
     }
     meta_path = output_root / TABLE_PLACE_IK_META_NAME
-    meta_path.write_text(
-        json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     if written <= 0:
         raise RuntimeError(

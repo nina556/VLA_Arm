@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-
 from gym_unoarm.constants import CONTROL_JOINTS, FPS, JOINTS
 
 if TYPE_CHECKING:
@@ -335,9 +334,7 @@ def generate_scripted_dataset(config: ScriptedGenConfig, *, log: LogFn = print) 
                 add_frame(dataset, obs, action.copy(), task_desc)
 
             dataset.save_episode()
-            jitter_msg = (
-                f", pose_jitter_l2={float(np.linalg.norm(jitter)):.4f}" if jitter is not None else ""
-            )
+            jitter_msg = f", pose_jitter_l2={float(np.linalg.norm(jitter)):.4f}" if jitter is not None else ""
             log(f"saved episode {ep + 1}/{config.episodes}: {len(raw_actions)} frames{jitter_msg}")
     finally:
         dataset.finalize()

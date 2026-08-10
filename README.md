@@ -145,6 +145,7 @@ uv run python -c "import gym_unoarm, gymnasium as gym; env = gym.make('gym_unoar
 ```
 
 **国内网络**务必先配 HF 镜像，否则下载 SmolVLA 权重会卡死：
+
 ```bash
 export HF_HUB_DISABLE_XET=1
 export HF_ENDPOINT=https://hf-mirror.com
@@ -158,22 +159,25 @@ Unoarm 是一个**双臂上肢机器人**的 MuJoCo 仿真，通过 Gymnasium �
 
 **观测 / 动作空间**（16 维，归一化到 [-1, 1]）：
 
-| 维度 | 含义 | 维度 | 含义 |
-|---|---|---|---|
-| 0-6 | 左臂关节 1-7 | 8-14 | 右臂关节 1-7 |
-| 7 | 左夹爪 | 15 | 右夹爪 |
+| 维度 | 含义         | 维度 | 含义         |
+| ---- | ------------ | ---- | ------------ |
+| 0-6  | 左臂关节 1-7 | 8-14 | 右臂关节 1-7 |
+| 7    | 左夹爪       | 15   | 右夹爪       |
 
 **相机**（3 个，480×640 RGB）：
+
 - `top`：世界固定俯视相机（外部视角）
 - `left_wrist`：挂载在左臂末端连杆 `Left_Link7` 上的手腕相机（随手运动）
 - `right_wrist`：挂载在右臂末端连杆 `Right_Link7` 上的手腕相机
 
 **关键特性**：
+
 - `UnoarmEnv.step(action)` 是**运动学执行**：直接把 `action` 写入 MuJoCo qpos，调 `mj_forward` 更新场景，不做物理仿真。这样数据收集稳定可复现。
 - 初始位姿 `RAW_ZERO`（全零归一化向量）= 机器人静止姿态。
 - `reward` 和 `success` 在 env 里是**硬编码常量**（`0.0` / `False`），因为这是 free-space 行为克隆任务，没有任务成功判定。**eval 的 success rate 数字没有参考价值**，模型好坏要看推理可视化（第 7 节）。
 
 **试用 env**：
+
 ```bash
 # 开 MuJoCo viewer 拖滑块手动控制
 uv run python custom_envs/unoarm/scripts/02_test_sim.py
@@ -229,6 +233,7 @@ key pose 定义在 `custom_envs/unoarm/data/poses_*.json`，格式：
 ```
 
 **规则**：
+
 - `task`：字符串，是 VLA 模型的语言输入（如 `"Prepare to fight and taunt."`）
 - `poses`：按顺序列出机器人要经过的关键位姿，脚本会在相邻 pose 间插值
 - 每个 pose 用**关节名映射**（不是数组），16 个关节，名字必须匹配 `CONTROL_JOINTS`：
@@ -267,17 +272,17 @@ uv run python custom_envs/unoarm/scripts/06_generate_scripted_data.py \
 
 **参数说明**：
 
-| 参数 | 默认 | 说明 |
-|---|---|---|
-| `--poses-json` | `data/poses_prepare_fight_taunt.json` | key pose 定义文件 |
-| `--episodes` | 30 | 生成的 episode 数 |
-| `--segment-steps` | 20 | 两个相邻 key pose 间插值多少帧 |
-| `--hold-steps` | 5 | 每个 key pose 保持多少帧 |
-| `--midpoint-noise-std` | 0.0 | 插值中点加噪声（端点为 0，保持轨迹平滑），增加数据多样性 |
-| `--hold-noise-std` | 0.0 | hold 段加微抖动，避免完全静止产生重复帧 |
-| `--pose-jitter-std` | 0.0 | 每个 episode 对 key pose 加固定偏移，让 30 个 episode 风格各有不同 |
-| `--seed` | 0 | 基础种子；每个 episode 用 `seed + episode_index` |
-| `--overwrite` | - | 输出目录已存在时先删除 |
+| 参数                   | 默认                                  | 说明                                                               |
+| ---------------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| `--poses-json`         | `data/poses_prepare_fight_taunt.json` | key pose 定义文件                                                  |
+| `--episodes`           | 30                                    | 生成的 episode 数                                                  |
+| `--segment-steps`      | 20                                    | 两个相邻 key pose 间插值多少帧                                     |
+| `--hold-steps`         | 5                                     | 每个 key pose 保持多少帧                                           |
+| `--midpoint-noise-std` | 0.0                                   | 插值中点加噪声（端点为 0，保持轨迹平滑），增加数据多样性           |
+| `--hold-noise-std`     | 0.0                                   | hold 段加微抖动，避免完全静止产生重复帧                            |
+| `--pose-jitter-std`    | 0.0                                   | 每个 episode 对 key pose 加固定偏移，让 30 个 episode 风格各有不同 |
+| `--seed`               | 0                                     | 基础种子；每个 episode 用 `seed + episode_index`                   |
+| `--overwrite`          | -                                     | 输出目录已存在时先删除                                             |
 
 **为什么需要噪声参数**：如果 `midpoint-noise-std`、`hold-noise-std`、`pose-jitter-std` 全是 0，30 个 episode 会生成**完全相同**的轨迹（因为 key pose 是硬编码的）。推荐值（`0.02 / 0.01 / 0.05`）能让轨迹保持主旋律的同时各有差异，提升模型泛化能力。
 
@@ -297,6 +302,7 @@ uv run python custom_envs/unoarm/scripts/07_replay_dataset.py \
 ```
 
 **参数**：
+
 - `--episode N`：回放第 N 个 episode
 - `--speed 1.0`：播放倍速（`0` = 最快）
 - `--loop`：循环播放直到关 viewer
@@ -333,21 +339,22 @@ DEVICE=cuda uv run unoarm-train \
 
 **关键参数说明**：
 
-| 参数 | 值 | 说明 |
-|---|---|---|
-| `DEVICE=cuda` | 环境变量 | 强制 GPU（SmolVLA 必须用 CUDA） |
-| `--policy.path=lerobot/smolvla_base` | HF 预训练权重 | **微调模式**，首次下载约 900MB |
-| `--rename_map` | 相机映射 | **必填**，见下方说明 |
-| `--batch_size=4` | 小 batch | 显存大可改 8，OOM 改 2 |
-| `--steps=20000` | 训练步数 | 7650 帧 / batch 4 ≈ 10 epoch |
-| `--eval_steps=0` | 不跑 eval | env 的 reward/success 是常量，eval 无意义 |
-| `--eval.use_async_envs=false` | 单进程 | 避免 NamespaceNotFound（见 REQUIREMENTS.md 3.7） |
+| 参数                                 | 值            | 说明                                             |
+| ------------------------------------ | ------------- | ------------------------------------------------ |
+| `DEVICE=cuda`                        | 环境变量      | 强制 GPU（SmolVLA 必须用 CUDA）                  |
+| `--policy.path=lerobot/smolvla_base` | HF 预训练权重 | **微调模式**，首次下载约 900MB                   |
+| `--rename_map`                       | 相机映射      | **必填**，见下方说明                             |
+| `--batch_size=4`                     | 小 batch      | 显存大可改 8，OOM 改 2                           |
+| `--steps=20000`                      | 训练步数      | 7650 帧 / batch 4 ≈ 10 epoch                     |
+| `--eval_steps=0`                     | 不跑 eval     | env 的 reward/success 是常量，eval 无意义        |
+| `--eval.use_async_envs=false`        | 单进程        | 避免 NamespaceNotFound（见 REQUIREMENTS.md 3.7） |
 
 #### 6.2 `--rename_map` 为什么必填
 
 `smolvla_base` 预训练时用的相机 key 是 `camera1/2/3`（论文里的 OBS_IMAGE_1/2/3），本数据集用的是 `top/left_wrist/right_wrist`。policy 严格校验 key 一致性，不匹配会立刻报错退出。
 
 按 SmolVLA 论文约定映射：
+
 - `camera1` = top（俯视）
 - `camera2` = wrist（手腕）
 - `camera3` = side（侧视）
@@ -385,9 +392,11 @@ uv run python custom_envs/unoarm/scripts/08_interact.py
 ```
 
 **使用流程**：
+
 1. 脚本加载 checkpoint（默认 `data/outputs/smolvla_unoarm/checkpoints/last/pretrained_model`）
 2. 打开 MuJoCo viewer 显示机器人
 3. 终端提示输入语言指令：
+
    ```
    === Unoarm SmolVLA interactive inference ===
    Type a language instruction and press Enter to run an episode.
@@ -395,20 +404,22 @@ uv run python custom_envs/unoarm/scripts/08_interact.py
 
    指令>
    ```
+
 4. 输入训练时用过的指令（如 `Prepare to fight and taunt.`），机器人会从静止位姿开始按模型输出的动作运动 255 步
 5. 一个 episode 结束后回到提示符，可输入下一条指令测试泛化
 6. 输入 `quit` / `exit` / 空回车，或关闭 viewer 退出
 
 **常用参数**：
 
-| 参数 | 默认 | 说明 |
-|---|---|---|
-| `--checkpoint` | `data/outputs/smolvla_unoarm/checkpoints/last/pretrained_model` | 指定不同步数的 checkpoint 对比 |
-| `--task "..."` | 无 | 单次模式：跑一条指令后退出（不进交互循环） |
-| `--max-steps` | 255 | 每个 episode 步数 |
-| `--speed` | 1.0 | 播放倍速 |
+| 参数           | 默认                                                            | 说明                                       |
+| -------------- | --------------------------------------------------------------- | ------------------------------------------ |
+| `--checkpoint` | `data/outputs/smolvla_unoarm/checkpoints/last/pretrained_model` | 指定不同步数的 checkpoint 对比             |
+| `--task "..."` | 无                                                              | 单次模式：跑一条指令后退出（不进交互循环） |
+| `--max-steps`  | 255                                                             | 每个 episode 步数                          |
+| `--speed`      | 1.0                                                             | 播放倍速                                   |
 
 **单次模式示例**：
+
 ```bash
 uv run python custom_envs/unoarm/scripts/08_interact.py \
   --task "Prepare to fight and taunt." \
@@ -533,30 +544,35 @@ uno-llm-lerobot-ACT/
 <summary><b>装环境踩坑（bazel / JDK / HF 卡死 / extras 缺失 等）</b></summary>
 
 见 [REQUIREMENTS.md 第 3 节"踩坑记录"](./REQUIREMENTS.md#3-踩坑记录)，包含 10 个实际踩到的坑和完整解决方案。
+
 </details>
 
 <details>
 <summary><b>训练时报相机 Feature mismatch</b></summary>
 
 `smolvla_base` 期望 `camera1/2/3`，你的数据是 `top/left_wrist/right_wrist`。训练命令必须带 `--rename_map`，见 [第 6.2 节](#62---rename_map-为什么必填)。
+
 </details>
 
 <details>
 <summary><b>eval 的 success rate 一直是 0%</b></summary>
 
 正常现象。`UnoarmEnv` 的 reward/success 是硬编码常量，eval 数字无意义。模型好坏看 [第 7 节](#7-训练后可视化验证) 的交互推理。
+
 </details>
 
 <details>
 <summary><b>生成的 30 个 episode 完全相同</b></summary>
 
 噪声参数全是 0 导致的。加 `--midpoint-noise-std 0.02 --hold-noise-std 0.01 --pose-jitter-std 0.05`，见 [第 4.3 节](#43-生成命令)。
+
 </details>
 
 <details>
 <summary><b>推理时报 OSError: Can't load processor for SmolVLM2</b></summary>
 
 VLM backbone 加载需要联网，但你的网络访问 HF 不通。`08_interact.py` 已内置 `HF_HUB_OFFLINE=1`；如果训练时遇到，前置该环境变量。见 [REQUIREMENTS.md 3.10](./REQUIREMENTS.md#310-smolvla-加载-vlm-processor-联网失败)。
+
 </details>
 
 <details>

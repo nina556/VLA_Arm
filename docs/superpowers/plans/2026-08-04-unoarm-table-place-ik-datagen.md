@@ -24,24 +24,26 @@
 
 ## File map
 
-| File | Responsibility |
-|------|----------------|
-| `custom_envs/unoarm/data_gen/table_place_ik.py` | Config, param sampling, TCP offset, clearance, keyframes, generate, meta |
-| `custom_envs/unoarm/tests/test_table_place_ik_datagen.py` | Unit + smoke tests for the module |
-| `custom_envs/unoarm/data_gen/reach_ik.py` | Extend `list_reach_ik_datasets` / info helpers to recognize `table_place_ik_meta.json` |
-| `custom_envs/unoarm/webapp/runner.py` | Scene dispatch in `start_reach_ik_generate` / generate loop |
-| `custom_envs/unoarm/static/web/index.html` | Table-place Reach-IK form block |
-| `custom_envs/unoarm/static/web/js/reach_ik.js` | Scene-aware UI + generate payload |
+| File                                                      | Responsibility                                                                         |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `custom_envs/unoarm/data_gen/table_place_ik.py`           | Config, param sampling, TCP offset, clearance, keyframes, generate, meta               |
+| `custom_envs/unoarm/tests/test_table_place_ik_datagen.py` | Unit + smoke tests for the module                                                      |
+| `custom_envs/unoarm/data_gen/reach_ik.py`                 | Extend `list_reach_ik_datasets` / info helpers to recognize `table_place_ik_meta.json` |
+| `custom_envs/unoarm/webapp/runner.py`                     | Scene dispatch in `start_reach_ik_generate` / generate loop                            |
+| `custom_envs/unoarm/static/web/index.html`                | Table-place Reach-IK form block                                                        |
+| `custom_envs/unoarm/static/web/js/reach_ik.js`            | Scene-aware UI + generate payload                                                      |
 
 ---
 
 ### Task 1: Clearance + TCP-offset helpers
 
 **Files:**
+
 - Create: `custom_envs/unoarm/data_gen/table_place_ik.py`
 - Test: `custom_envs/unoarm/tests/test_table_place_ik_datagen.py`
 
 **Interfaces:**
+
 - Produces:
   - `TABLE_PLACE_IK_META_NAME = "table_place_ik_meta.json"`
   - `DEFAULT_TABLE_CLEARANCE_M = 0.01`
@@ -150,7 +152,7 @@ Clamp sampled Z ranges so empty ranges cannot occur: if `hi < floor`, use `floor
 
 - [ ] **Step 4: Re-run tests — expect PASS**
 
-Run: same pytest command as Step 2  
+Run: same pytest command as Step 2
 Expected: PASS
 
 ---
@@ -158,14 +160,16 @@ Expected: PASS
 ### Task 2: Keyframe IK builder
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/data_gen/table_place_ik.py`
 - Test: `custom_envs/unoarm/tests/test_table_place_ik_datagen.py`
 
 **Interfaces:**
+
 - Consumes: Task 1 helpers; `solve_right_tcp_ik`; `GRIPPER_OPEN` / `GRIPPER_CLOSE`; `clip_raw_pose`
 - Produces:
   - `build_table_place_ik_poses(env, params: TablePlaceIkParams) -> list[np.ndarray] | None`
-  - Returns 6 raw 16-D poses: `[approach, pregrasp_open, grasp_close, lift, transport, release_open]`  
+  - Returns 6 raw 16-D poses: `[approach, pregrasp_open, grasp_close, lift, transport, release_open]`
     (settle is hold of release, not a separate IK solve)
 
 - [ ] **Step 1: Write failing test**
@@ -198,14 +202,14 @@ def test_build_table_place_ik_poses_shape():
 
 Algorithm (mirror sword: solve grasp first, then approach from seed):
 
-1. `env.reset()` already placed peg at default XY; do not move peg.  
-2. Measure `offset = grasp_center_tcp_offset(env)` at reset (or after a mid-reach seed if offset is unreliable at home — if `||offset||` tiny, apply a temporary open-gripper IK near peg once and remeasure).  
-3. `peg = peg_center`; `circle_xy = TABLE_CIRCLE_CENTER_XY`.  
-4. `grasp_tcp = peg - offset`  
-5. `approach_tcp = grasp_tcp + [0, params.approach_offset_y, 0]`  
-6. `lift_tcp = [peg[0], peg[1], params.lift_z] - offset` (XY stay at peg until transport)  
-7. `place_tcp = [circle_xy[0], circle_xy[1], params.place_z] - offset`  
-8. Solve IK sequence with open/close gripper helpers (same pattern as `reach_ik._with_right_gripper`).  
+1. `env.reset()` already placed peg at default XY; do not move peg.
+2. Measure `offset = grasp_center_tcp_offset(env)` at reset (or after a mid-reach seed if offset is unreliable at home — if `||offset||` tiny, apply a temporary open-gripper IK near peg once and remeasure).
+3. `peg = peg_center`; `circle_xy = TABLE_CIRCLE_CENTER_XY`.
+4. `grasp_tcp = peg - offset`
+5. `approach_tcp = grasp_tcp + [0, params.approach_offset_y, 0]`
+6. `lift_tcp = [peg[0], peg[1], params.lift_z] - offset` (XY stay at peg until transport)
+7. `place_tcp = [circle_xy[0], circle_xy[1], params.place_z] - offset`
+8. Solve IK sequence with open/close gripper helpers (same pattern as `reach_ik._with_right_gripper`).
 9. Any `None` IK → return `None`.
 
 - [ ] **Step 4: Run test — expect PASS**
@@ -217,10 +221,12 @@ Run: `... pytest tests/test_table_place_ik_datagen.py::test_build_table_place_ik
 ### Task 3: Dataset generator (success + clearance filter)
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/data_gen/table_place_ik.py`
 - Test: `custom_envs/unoarm/tests/test_table_place_ik_datagen.py`
 
 **Interfaces:**
+
 - Produces:
   - `@dataclass TablePlaceIkGenConfig` with fields from the spec (`num_episodes`, ranges, `table_clearance_m`, `settle_steps` default `PEG_FALL_MAX_STEPS`, `segment_steps`, `hold_steps`, `seed`, `output_root`, `repo_id`, `overwrite`, `task`, `ik_retries`, `pose_jitter_std`, `max_attempts` optional)
   - `generate_table_place_ik_dataset(config, *, log=print) -> Path`
@@ -289,7 +295,7 @@ Reuse `dataset_features`, `add_frame`, `build_episode_actions`, `clip_raw_pose`,
 
 - [ ] **Step 4: Run smoke test — expect PASS**
 
-Run: `... pytest tests/test_table_place_ik_datagen.py::test_generate_one_successful_episode -svv`  
+Run: `... pytest tests/test_table_place_ik_datagen.py::test_generate_one_successful_episode -svv`
 Expected: PASS (may take tens of seconds due to rendering)
 
 - [ ] **Step 5: Add discard test**
@@ -301,11 +307,13 @@ Force clearance failure by monkeypatching `lift_transport_clears_table` to retur
 ### Task 4: Dataset list / meta discovery
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/data_gen/reach_ik.py` (`list_reach_ik_datasets`, optionally `load_reach_ik_meta` dual-read)
 - Modify: `custom_envs/unoarm/webapp/runner.py` `get_reach_ik_dataset_info` if needed
 - Test: extend `tests/test_table_place_ik_datagen.py` or `tests/test_reach_ik_datagen.py`
 
 **Interfaces:**
+
 - Produces: listing entries with `kind: "table_place_ik"` when `table_place_ik_meta.json` exists
 - `load_table_place_ik_meta(root) -> dict | None` can live in `table_place_ik.py`; list function imports it
 
@@ -322,9 +330,11 @@ In `list_reach_ik_datasets`, also check `child / "table_place_ik_meta.json"`; se
 ### Task 5: Web runner dispatch
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/webapp/runner.py` (`start_reach_ik_generate`, `_reach_ik_generate_loop`)
 
 **Interfaces:**
+
 - Consumes: `TablePlaceIkGenConfig`, `generate_table_place_ik_dataset`
 - When `self.cfg.scene == SCENE_TABLE_PLACE` (or `settings scene`), build table-place config from params and run that generator; else existing sword path
 
@@ -348,15 +358,15 @@ Add `_table_place_ik_generate_loop` mirroring `_reach_ik_generate_loop` but call
 
 Param keys (Web → config):
 
-| Web field | Config |
-|-----------|--------|
-| `num_episodes` | `num_episodes` |
-| `approach_offset_y_min/max` | `approach_offset_y_range` |
-| `lift_z_min/max` | `lift_z_range` (absolute world Z) |
-| `place_z_min/max` | `place_z_range` |
-| `table_clearance_m` | `table_clearance_m` |
-| `settle_steps` | `settle_steps` |
-| `segment_steps`, `hold_steps`, `seed`, `output_name`, `overwrite`, `pose_jitter_std`, `task` | same |
+| Web field                                                                                    | Config                            |
+| -------------------------------------------------------------------------------------------- | --------------------------------- |
+| `num_episodes`                                                                               | `num_episodes`                    |
+| `approach_offset_y_min/max`                                                                  | `approach_offset_y_range`         |
+| `lift_z_min/max`                                                                             | `lift_z_range` (absolute world Z) |
+| `place_z_min/max`                                                                            | `place_z_range`                   |
+| `table_clearance_m`                                                                          | `table_clearance_m`               |
+| `settle_steps`                                                                               | `settle_steps`                    |
+| `segment_steps`, `hold_steps`, `seed`, `output_name`, `overwrite`, `pose_jitter_std`, `task` | same                              |
 
 Default absolute Z ranges on the server if omitted: compute from `table_place_top_z()` + half height + clearance + margins matching the spec table.
 
@@ -367,6 +377,7 @@ Default absolute Z ranges on the server if omitted: compute from `table_place_to
 ### Task 6: Web UI for table_place
 
 **Files:**
+
 - Modify: `custom_envs/unoarm/static/web/index.html`
 - Modify: `custom_envs/unoarm/static/web/js/reach_ik.js`
 
@@ -390,8 +401,8 @@ Shared controls (segment/hold/output/overwrite) stay visible for both.
 
 Replace placeholder `warnIfTablePlace` with `syncReachIkSceneUi(scene)`:
 
-- `table_place`: show `#rikTablePlaceBlock`, hide `#rikSwordBlocks`, update hint to pick-place copy  
-- else: opposite  
+- `table_place`: show `#rikTablePlaceBlock`, hide `#rikSwordBlocks`, update hint to pick-place copy
+- else: opposite
 
 Call on setup and when settings are saved (hook existing settings refresh if available; otherwise re-fetch `/api/settings` when Reach-IK mode opens).
 
@@ -430,23 +441,23 @@ Ensure seed is available in shared UI for table-place (move seed out of bbox-onl
 
 ## Spec coverage checklist
 
-| Spec requirement | Task |
-|------------------|------|
-| New `table_place_ik.py` module | 1–3 |
+| Spec requirement                             | Task |
+| -------------------------------------------- | ---- |
+| New `table_place_ik.py` module               | 1–3  |
 | Fixed peg/circle; sample approach/lift/place | 1, 3 |
-| Keyframes approach→…→release + settle | 2–3 |
-| Grasp-center TCP offset | 1–2 |
-| Success-only + attach + settle | 3 |
-| Lift/transport table clearance | 1, 3 |
-| Meta `table_place_ik_meta.json` | 3–4 |
-| Web scene-linked UI | 6 |
-| Runner dispatch | 5 |
-| Tests | 1–4 |
+| Keyframes approach→…→release + settle        | 2–3  |
+| Grasp-center TCP offset                      | 1–2  |
+| Success-only + attach + settle               | 3    |
+| Lift/transport table clearance               | 1, 3 |
+| Meta `table_place_ik_meta.json`              | 3–4  |
+| Web scene-linked UI                          | 6    |
+| Runner dispatch                              | 5    |
+| Tests                                        | 1–4  |
 
 ## Self-review notes
 
-- No CLI task (spec non-goal).  
-- Replay 3D already has peg/circle; listing kind update is enough for v1.  
+- No CLI task (spec non-goal).
+- Replay 3D already has peg/circle; listing kind update is enough for v1.
 - Commit steps omitted per global constraint (user must request commits).
 
 ---
@@ -455,7 +466,7 @@ Plan complete and saved to `docs/superpowers/plans/2026-08-04-unoarm-table-place
 
 **Two execution options:**
 
-1. **Subagent-Driven (recommended)** — fresh subagent per task, review between tasks  
-2. **Inline Execution** — implement in this session with executing-plans checkpoints  
+1. **Subagent-Driven (recommended)** — fresh subagent per task, review between tasks
+2. **Inline Execution** — implement in this session with executing-plans checkpoints
 
 Which approach?

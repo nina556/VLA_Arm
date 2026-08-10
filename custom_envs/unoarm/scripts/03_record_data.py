@@ -11,6 +11,7 @@ from pathlib import Path
 import mujoco
 import mujoco.viewer
 import numpy as np
+
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -250,7 +251,10 @@ def main() -> None:
                             )
 
                     # 4. If no keyboard input this frame and the sliders moved, follow the sliders.
-                    if not key_pressed_this_frame and np.linalg.norm(slider_target - current_target) > SLIDER_DEADBAND:
+                    if (
+                        not key_pressed_this_frame
+                        and np.linalg.norm(slider_target - current_target) > SLIDER_DEADBAND
+                    ):
                         current_target = slider_target.copy()
                         gripper_state["left"] = float(current_target[7])
                         gripper_state["right"] = float(current_target[15])

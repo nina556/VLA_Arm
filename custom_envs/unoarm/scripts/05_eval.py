@@ -38,12 +38,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from gym_unoarm.constants import JOINTS, SCENE_REACH_SWORD  # noqa: E402
+from gym_unoarm.env import UnoarmEnv  # noqa: E402
+
 from lerobot.policies import make_pre_post_processors  # noqa: E402
 from lerobot.policies.act import ACTPolicy  # noqa: E402
 from lerobot.policies.utils import build_inference_frame  # noqa: E402
-
-from gym_unoarm.constants import FPS, JOINTS, SCENE_REACH_SWORD  # noqa: E402
-from gym_unoarm.env import UnoarmEnv  # noqa: E402
 
 # Training AABB (from unoarm_train/reach_ik_meta.json). Validation targets are
 # sampled INSIDE this box so we measure in-distribution fit, not extrapolation.
@@ -107,14 +107,13 @@ def run_eval(
     n_action_steps: int = 10,
 ) -> dict:
     from lerobot.configs import PreTrainedConfig
+
     config = PreTrainedConfig.from_pretrained(checkpoint)
     chunk = int(getattr(config, "chunk_size", 50))
     if n_action_steps < 1:
         raise ValueError(f"n_action_steps must be >= 1, got {n_action_steps}")
     if n_action_steps > chunk:
-        raise ValueError(
-            f"n_action_steps ({n_action_steps}) cannot exceed chunk_size ({chunk})"
-        )
+        raise ValueError(f"n_action_steps ({n_action_steps}) cannot exceed chunk_size ({chunk})")
     config.n_action_steps = int(n_action_steps)
     print(f"[info] inference n_action_steps={config.n_action_steps} (chunk_size={chunk})")
     policy = ACTPolicy.from_pretrained(checkpoint, config=config)
@@ -263,13 +262,11 @@ def run_eval(
             else "grip:never"
         )
         attach_str = (
-            f"attach@step{attach_step}({attach_dist_cm:.0f}cm)"
-            if attach_step is not None
-            else "attach:never"
+            f"attach@step{attach_step}({attach_dist_cm:.0f}cm)" if attach_step is not None else "attach:never"
         )
         print(
-            f"[{tag}] ep{ep+1:3d}/{episodes} handle=[{handle[0]:+.3f},{handle[1]:+.3f},{handle[2]:+.3f}] "
-            f"min_dist={best_dist*100:.1f}cm {grip_str} {attach_str} "
+            f"[{tag}] ep{ep + 1:3d}/{episodes} handle=[{handle[0]:+.3f},{handle[1]:+.3f},{handle[2]:+.3f}] "
+            f"min_dist={best_dist * 100:.1f}cm {grip_str} {attach_str} "
             f"final_attached={int(final_attached)} steps={step}"
         )
 
@@ -319,8 +316,28 @@ def run_eval(
         # well-timed grasp, large means premature. None-list excluded.
         "gripper": {
             "ever_closed_rate": float(np.mean([e["gripper_ever_closed"] for e in per_episode])),
-            "mean_first_close_step": float(np.mean([e["gripper_first_close_step"] for e in per_episode if e["gripper_first_close_step"] is not None])) if any(e["gripper_first_close_step"] is not None for e in per_episode) else None,
-            "mean_first_close_dist_cm": float(np.mean([e["gripper_first_close_dist_cm"] for e in per_episode if e["gripper_first_close_dist_cm"] is not None])) if any(e["gripper_first_close_dist_cm"] is not None for e in per_episode) else None,
+            "mean_first_close_step": float(
+                np.mean(
+                    [
+                        e["gripper_first_close_step"]
+                        for e in per_episode
+                        if e["gripper_first_close_step"] is not None
+                    ]
+                )
+            )
+            if any(e["gripper_first_close_step"] is not None for e in per_episode)
+            else None,
+            "mean_first_close_dist_cm": float(
+                np.mean(
+                    [
+                        e["gripper_first_close_dist_cm"]
+                        for e in per_episode
+                        if e["gripper_first_close_dist_cm"] is not None
+                    ]
+                )
+            )
+            if any(e["gripper_first_close_dist_cm"] is not None for e in per_episode)
+            else None,
         },
     }
 
@@ -338,44 +355,74 @@ def run_eval(
         json.dump(per_episode, fh, indent=2, ensure_ascii=False)
     with (out_dir / "episodes.csv").open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        writer.writerow([
-            "episode", "handle_x", "handle_y", "handle_z", "min_dist_cm", "steps", "success",
-            "final_attached", "ever_attached", "attach_step", "attach_dist_cm",
-            "near_success_legacy",
-            "gripper_ever_closed", "gripper_first_close_step", "gripper_first_close_dist_cm",
-        ])
+        writer.writerow(
+            [
+                "episode",
+                "handle_x",
+                "handle_y",
+                "handle_z",
+                "min_dist_cm",
+                "steps",
+                "success",
+                "final_attached",
+                "ever_attached",
+                "attach_step",
+                "attach_dist_cm",
+                "near_success_legacy",
+                "gripper_ever_closed",
+                "gripper_first_close_step",
+                "gripper_first_close_dist_cm",
+            ]
+        )
         for e in per_episode:
-            writer.writerow([
-                e["episode"], *e["handle_xyz"], f"{e['min_dist_cm']:.2f}", e["steps"], int(e["success"]),
-                int(e["final_attached"]), int(e["ever_attached"]),
-                e["attach_step"] if e["attach_step"] is not None else "",
-                f"{e['attach_dist_cm']:.2f}" if e["attach_dist_cm"] is not None else "",
-                int(e["near_success_legacy"]),
-                int(e["gripper_ever_closed"]),
-                e["gripper_first_close_step"] if e["gripper_first_close_step"] is not None else "",
-                f"{e['gripper_first_close_dist_cm']:.2f}" if e["gripper_first_close_dist_cm"] is not None else "",
-            ])
+            writer.writerow(
+                [
+                    e["episode"],
+                    *e["handle_xyz"],
+                    f"{e['min_dist_cm']:.2f}",
+                    e["steps"],
+                    int(e["success"]),
+                    int(e["final_attached"]),
+                    int(e["ever_attached"]),
+                    e["attach_step"] if e["attach_step"] is not None else "",
+                    f"{e['attach_dist_cm']:.2f}" if e["attach_dist_cm"] is not None else "",
+                    int(e["near_success_legacy"]),
+                    int(e["gripper_ever_closed"]),
+                    e["gripper_first_close_step"] if e["gripper_first_close_step"] is not None else "",
+                    f"{e['gripper_first_close_dist_cm']:.2f}"
+                    if e["gripper_first_close_dist_cm"] is not None
+                    else "",
+                ]
+            )
 
     print()
     print("=" * 60)
-    print(f"SUCCESS RATE (final grasp attach): {successes}/{episodes} = {rate*100:.1f}%")
-    print(f"legacy near(<{REACH_NEAR_M*100:.0f}cm) rate: {summary['legacy_near_success_rate']*100:.1f}%  "
-          f"ever_attached: {summary['attach_rate_ever']*100:.1f}%")
-    print(f"min reach distance: mean={summary['mean_min_dist_cm']:.1f}cm "
-          f"median={summary['median_min_dist_cm']:.1f}cm max={summary['max_min_dist_cm']:.1f}cm")
+    print(f"SUCCESS RATE (final grasp attach): {successes}/{episodes} = {rate * 100:.1f}%")
+    print(
+        f"legacy near(<{REACH_NEAR_M * 100:.0f}cm) rate: {summary['legacy_near_success_rate'] * 100:.1f}%  "
+        f"ever_attached: {summary['attach_rate_ever'] * 100:.1f}%"
+    )
+    print(
+        f"min reach distance: mean={summary['mean_min_dist_cm']:.1f}cm "
+        f"median={summary['median_min_dist_cm']:.1f}cm max={summary['max_min_dist_cm']:.1f}cm"
+    )
     print("(success = sword still clamped by right gripper at episode end)")
     sr = summary["success_rate_by_half"]
-    print(f"success by half  x[low/high]: {sr['x']['low']*100:.0f}%/{sr['x']['high']*100:.0f}%  "
-          f"y: {sr['y']['low']*100:.0f}%/{sr['y']['high']*100:.0f}%  "
-          f"z: {sr['z']['low']*100:.0f}%/{sr['z']['high']*100:.0f}%")
+    print(
+        f"success by half  x[low/high]: {sr['x']['low'] * 100:.0f}%/{sr['x']['high'] * 100:.0f}%  "
+        f"y: {sr['y']['low'] * 100:.0f}%/{sr['y']['high'] * 100:.0f}%  "
+        f"z: {sr['z']['low'] * 100:.0f}%/{sr['z']['high'] * 100:.0f}%"
+    )
     g = summary["gripper"]
     grip_rate = g["ever_closed_rate"] * 100
     grip_step = g["mean_first_close_step"]
     grip_dist = g["mean_first_close_dist_cm"]
     grip_step_s = f"{grip_step:.0f}" if grip_step is not None else "n/a"
     grip_dist_s = f"{grip_dist:.1f}cm" if grip_dist is not None else "n/a"
-    print(f"gripper closed in {grip_rate:.0f}% of episodes; "
-          f"avg first close @ step {grip_step_s} (dist {grip_dist_s})")
+    print(
+        f"gripper closed in {grip_rate:.0f}% of episodes; "
+        f"avg first close @ step {grip_step_s} (dist {grip_dist_s})"
+    )
     print(f"logs saved to: {out_dir}")
     print("=" * 60)
     return summary
@@ -384,21 +431,28 @@ def run_eval(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--checkpoint", type=str,
+        "--checkpoint",
+        type=str,
         default="data/outputs/020000/pretrained_model",
         help="Path to the pretrained_model directory.",
     )
     parser.add_argument("--episodes", type=int, default=50, help="Number of validation rollouts.")
     parser.add_argument("--seed", type=int, default=12345, help="Random seed for target sampling.")
-    parser.add_argument("--render", action="store_true", help="Launch MuJoCo viewer (off by default for speed).")
     parser.add_argument(
-        "--from_meta", type=str, default=None,
+        "--render", action="store_true", help="Launch MuJoCo viewer (off by default for speed)."
+    )
+    parser.add_argument(
+        "--from_meta",
+        type=str,
+        default=None,
         help="Path to a reach_ik_meta.json. When set, validation targets are read "
         "from it (one per unique target_index) instead of sampled uniformly. Use "
         "this to evaluate on the EXACT points the model was trained on.",
     )
     parser.add_argument(
-        "--n_action_steps", type=int, default=10,
+        "--n_action_steps",
+        type=int,
+        default=10,
         help="How many predicted actions to execute before re-querying the policy "
         "(must be <= checkpoint chunk_size). Default 10 ≈ 0.5s at 20 FPS.",
     )

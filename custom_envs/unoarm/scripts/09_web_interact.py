@@ -9,11 +9,10 @@ Minimal launch — configure checkpoint / tasks in the Web UI:
 from __future__ import annotations
 
 import argparse
+import os
 import socket
 import sys
 from pathlib import Path
-
-import os
 
 # Prefer EGL for offscreen rendering in the web server process.
 os.environ.setdefault("MUJOCO_GL", "egl")
@@ -26,7 +25,6 @@ if str(REPO_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
 import uvicorn  # noqa: E402
-
 from webapp.app import build_app  # noqa: E402
 from webapp.runner import UnoarmWebRunner, webconfig_from_settings  # noqa: E402
 from webapp.settings_store import DEFAULT_SETTINGS_PATH, load_settings  # noqa: E402
@@ -34,7 +32,7 @@ from webapp.settings_store import DEFAULT_SETTINGS_PATH, load_settings  # noqa: 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host", type=str, default="0.0.0.0")
+    parser.add_argument("--host", type=str, default="0.0.0.0")  # nosec B104 - intentional LAN UI
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument(
         "--settings",
@@ -85,8 +83,8 @@ def _pids_listening_on_port(port: int) -> list[int]:
     candidates: list[list[str]] = [
         ["ss", "-ltnp"],
         ["/usr/sbin/ss", "-ltnp"],
-        ["lsof", "-iTCP:%d" % port, "-sTCP:LISTEN", "-t"],
-        ["fuser", "%d/tcp" % port],
+        ["lsof", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+        ["fuser", f"{port}/tcp"],
     ]
     for cmd in candidates:
         try:
@@ -132,7 +130,6 @@ def free_port(port: int, *, timeout: float = 3.0) -> None:
     Only acts on WSL/Linux; silently no-ops if nothing is listening.
     """
     import signal
-    import subprocess
     import time
 
     pids = _pids_listening_on_port(port)
@@ -168,7 +165,7 @@ def open_windows_chrome(port: int) -> None:
     try:
         import subprocess
 
-        subprocess.Popen(
+        subprocess.Popen(  # nosec B607 - invokes the fixed project launcher
             ["bash", str(script), str(port)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -200,7 +197,7 @@ def main() -> None:
     app = build_app(runner)
     ip = local_ip()
     print("\nUnoarm Web ready:", flush=True)
-    if cfg.host == "0.0.0.0":
+    if cfg.host == "0.0.0.0":  # nosec B104 - display logic for intentional LAN binding
         print(f"  WSL/Linux: http://127.0.0.1:{cfg.port}", flush=True)
         if ip:
             print(f"  Windows host: http://{ip}:{cfg.port}", flush=True)
