@@ -77,8 +77,11 @@ coverage.xml
 *.cover
 *.py,cover
 # Upstream LeRobot binary fixtures require LFS objects that are not included in
-# this standalone Unoarm workspace. Keep local copies out of this repository.
-tests/artifacts/
+# this standalone Unoarm workspace. Keep binaries out, but retain the small
+# Python helper modules imported by the test suite and Ruff's import sorter.
+tests/artifacts/**
+!tests/artifacts/**/
+!tests/artifacts/**/*.py
 
 ### Logs & Temporary Files ###
 logs/
