@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lerobot-unoarm"
+version = "0.1.0"
+description = "Unoarm MuJoCo/Gymnasium environment for LeRobot"
+requires-python = ">=3.10"
+dependencies = [
+  "gymnasium",
+  "fastapi",
+  "mujoco",
+  "numpy",
+  "openai",
+  "uvicorn[standard]",
+]
+
+[project.scripts]
+unoarm-train = "lerobot_unoarm.wrapper:main"
+unoarm-eval = "lerobot_unoarm.wrapper:eval_main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gym_unoarm*", "lerobot_unoarm*"]
+
+[tool.setuptools.package-data]
+gym_unoarm = [
+  "*.xml",
+  "*.urdf",
+  "meshes/*",
+]

@@ -1,0 +1,22 @@
+# Ignore generated datasets (unoarm_*/) but keep key-pose JSON definitions.
+data/unoarm_*/
+data/*.zip
+
+# Local web console state (machine-specific paths / sword pose / checkpoint).
+data/web_settings.json
+data/designs/
+
+# Generated MJCF: rewritten from mujoco_unoarm.xml + local sword settings on startup.
+gym_unoarm/mujoco_unoarm_reach_sword.xml
+
+# Runtime / tool noise
+*.log
+tests/outputs/
+.venv/
+*.egg-info/
+build/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+uv.lock

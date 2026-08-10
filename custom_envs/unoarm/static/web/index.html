@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unoarm VLA Web</title>
+  <link rel="stylesheet" href="/static/css/app.css?v=foldcompact2" />
+</head>
+<body>
+  <div id="sceneBlackout" class="scene-blackout" aria-hidden="true"></div>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark">U</div>
+        <div class="brand-text">
+          <h1>Unoarm VLA Web</h1>
+          <span>SmolVLA 交互控制台</span>
+        </div>
+      </div>
+      <div class="status-strip">
+        <div class="status-item" id="statusConn" data-state="pending">
+          <span class="status-dot"></span><b>连接</b><span class="status-value">连接中</span>
+        </div>
+        <div class="status-item" id="statusRollout" data-state="neutral">
+          <span class="status-dot"></span><b>执行</b><span class="status-value">空闲</span>
+        </div>
+        <div class="status-item" id="statusTask" data-state="neutral">
+          <span class="status-dot"></span><b>任务</b><span class="status-value">--</span>
+        </div>
+        <div class="status-item" id="statusStep" data-state="neutral">
+          <span class="status-dot"></span><b>步数</b><span class="status-value">0 / 0</span>
+        </div>
+        <div class="status-item" id="statusReach" data-state="neutral">
+          <span class="status-dot"></span><b>到位</b><span class="status-value">--</span>
+        </div>
+        <div class="status-item" id="statusPolicy" data-state="warn">
+          <span class="status-dot"></span><b>策略</b><span class="status-value">未知</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="mode-toggle-group">
+          <button id="modeChatBtn" class="mode-toggle active" type="button" data-mode="chat">对话</button>
+          <button id="modeDesignBtn" class="mode-toggle" type="button" data-mode="design">动作设计</button>
+          <button id="modeSwordBtn" class="mode-toggle" type="button" data-mode="sword">目标位姿</button>
+          <button id="modeReachIkBtn" class="mode-toggle" type="button" data-mode="reach_ik">Reach-IK</button>
+          <button id="modeValidateBtn" class="mode-toggle" type="button" data-mode="validate">验证</button>
+          <button id="modeSettingsBtn" class="mode-toggle" type="button" data-mode="settings">设置</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="workspace obs-open" id="workspace">
+      <aside id="obsSidebar" class="obs-sidebar" aria-label="观测相机（训练/推理同款）">
+        <div class="obs-sidebar-header">
+          <div class="obs-sidebar-title">
+            <strong>观测相机</strong>
+            <span>训练/推理同款</span>
+          </div>
+          <button id="obsSidebarCloseBtn" type="button" title="关闭观测相机">关闭</button>
+        </div>
+        <div class="obs-sidebar-body">
+          <figure class="obs-cam">
+            <figcaption>top（俯视）</figcaption>
+            <img id="camTop" alt="top camera" />
+          </figure>
+          <figure class="obs-cam">
+            <figcaption>left_wrist（左腕）</figcaption>
+            <img id="camLeftWrist" alt="left wrist camera" />
+          </figure>
+          <figure class="obs-cam">
+            <figcaption>right_wrist（右腕）</figcaption>
+            <img id="camRightWrist" alt="right wrist camera" />
+          </figure>
+        </div>
+      </aside>
+
+      <section class="scene-panel">
+        <canvas id="sceneCanvas" aria-label="UnoArm 3D 模型"></canvas>
+        <div class="scene-load-state" id="sceneLoadState">
+          <span class="spinner"></span><span>正在加载 UnoArm URDF...</span>
+        </div>
+        <div class="scene-toolbar">
+          <button id="obsSidebarToggleBtn" type="button" class="obs-toggle active" title="观测相机">相机</button>
+          <button id="todToggleBtn" type="button" class="tod-toggle" title="切换到黑夜" data-mode="day">夜</button>
+          <button id="fitViewBtn" type="button" title="适配模型">&#8634;</button>
+          <button id="frontViewBtn" type="button" title="正视图">&#8595;</button>
+          <button id="resetViewBtn" type="button" title="重置视图">&#8635;</button>
+        </div>
+        <div class="scene-legend">
+          <span><i class="legend-dot robot"></i>机器人</span>
+          <span><i class="legend-dot target"></i>剑柄</span>
+          <span><i class="legend-dot shield"></i>盾牌</span>
+        </div>
+        <div class="scene-summary">
+          <span id="fpsLabel">-- FPS</span>
+          <span id="modelState">URDF 加载中</span>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <div id="chatPanel" class="panel active">
+          <div id="messages" class="messages"></div>
+          <form id="composer" class="composer">
+            <textarea id="input" rows="1" autocomplete="off" spellcheck="false" placeholder="输入指令..."></textarea>
+            <button id="sendBtn" class="primary" type="submit">发送</button>
+          </form>
+          <pre id="logs" class="logs"></pre>
+        </div>
+
+        <div id="designPanel" class="panel">
+          <div class="design-scroll">
+            <details class="design-section design-fold" open>
+              <summary class="settings-fold-summary"><h3 class="design-heading">当前姿态</h3></summary>
+              <p class="design-hint">数值为 MuJoCo 原始关节角（弧度），与 02_test_sim 一致；非 [-1,1] 归一化。</p>
+              <div id="designReachStatus" class="design-reach-status" data-state="idle">reach：选择左侧盾牌 / 右侧剑柄查看距离</div>
+              <div class="arm-side-toggle" role="group" aria-label="到位目标手臂">
+                <button id="armSideLeftBtn" type="button" data-side="left">左侧·盾牌</button>
+                <button id="armSideRightBtn" type="button" class="active" data-side="right">右侧·剑柄</button>
+              </div>
+              <div id="selectedJointLabel" class="selected-joint-label">未选中关节</div>
+              <div id="jointSliders" class="joint-sliders"></div>
+              <div class="design-actions">
+                <button id="zeroPoseBtn" type="button">归零</button>
+                <button id="saveKeyframeBtn" type="button" class="primary">保存关键帧</button>
+              </div>
+            </details>
+
+            <details class="design-section design-fold">
+              <summary class="settings-fold-summary"><h3 class="design-heading">关键帧库</h3></summary>
+              <div id="keyframeList" class="design-list"></div>
+            </details>
+
+            <details class="design-section design-fold">
+              <summary class="settings-fold-summary"><h3 class="design-heading">播放列表</h3></summary>
+              <div id="playlist" class="design-list"></div>
+              <div class="design-actions design-actions-wrap">
+                <button id="addToPlaylistBtn" type="button">添加选中关键帧</button>
+                <button id="moveUpBtn" type="button">上移</button>
+                <button id="moveDownBtn" type="button">下移</button>
+                <button id="removePlaylistBtn" type="button">移除</button>
+                <button id="previewBtn" type="button">预览</button>
+                <button id="stopPreviewBtn" type="button">停止预览</button>
+              </div>
+            </details>
+
+            <details class="design-section design-fold">
+              <summary class="settings-fold-summary"><h3 class="design-heading">保存动作</h3></summary>
+              <label class="design-label" for="taskInput">Task（英文任务）</label>
+              <input id="taskInput" class="design-input" type="text" autocomplete="off" spellcheck="false" placeholder="Prepare to fight and then taunt." />
+              <label class="design-label" for="designName">名称</label>
+              <input id="designName" class="design-input" type="text" autocomplete="off" spellcheck="false" placeholder="my_design" />
+              <button id="saveDesignBtn" type="button" class="primary">保存动作</button>
+            </details>
+
+            <details class="design-section design-fold">
+              <summary class="settings-fold-summary"><h3 class="design-heading">已保存动作</h3></summary>
+              <div id="designList" class="design-list"></div>
+              <div class="generate-area">
+                <div class="generate-row">
+                  <label class="design-label" for="genEpisodes">Episodes（局数）</label>
+                  <input id="genEpisodes" class="design-input design-input-sm" type="number" min="1" value="30" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="genSegmentSteps">Segment steps（段步数）</label>
+                  <input id="genSegmentSteps" class="design-input design-input-sm" type="number" min="1" value="20" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="genHoldSteps">Hold steps（保持步数）</label>
+                  <input id="genHoldSteps" class="design-input design-input-sm" type="number" min="0" value="2" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="genPoseJitter">Pose jitter（姿态扰动 rad）</label>
+                  <input id="genPoseJitter" class="design-input design-input-sm" type="number" min="0" step="0.01" value="0.05" />
+                </div>
+                <label class="design-checkbox">
+                  <input id="genOverwrite" type="checkbox" />
+                  Overwrite（覆盖）
+                </label>
+                <button id="generateBtn" type="button">生成数据</button>
+                <pre id="generateStatus" class="generate-status"></pre>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div id="settingsPanel" class="panel">
+          <div class="design-scroll">
+            <form id="settingsForm" class="settings-form">
+              <details class="design-section settings-fold" open>
+                <summary class="settings-fold-summary"><h3 class="design-heading">Policy（策略 · SmolVLA）</h3></summary>
+                <p class="design-hint">填写 checkpoint 目录后点保存即可加载；启动命令无需再带参数。</p>
+                <label class="design-label" for="set_checkpoint">Checkpoint（权重路径）</label>
+                <input id="set_checkpoint" class="design-input" type="text" spellcheck="false" placeholder="/path/to/pretrained_model" />
+                <label class="design-label" for="set_vlm_model_name">VLM model（视觉语言模型 / 路径）</label>
+                <input id="set_vlm_model_name" class="design-input" type="text" spellcheck="false" placeholder="HuggingFaceTB/SmolVLM2-500M-Video-Instruct" />
+                <label class="design-label" for="set_device">Device（运行设备，空=自动）</label>
+                <input id="set_device" class="design-input" type="text" spellcheck="false" placeholder="cuda / cpu" />
+              </details>
+
+              <details class="design-section settings-fold" open>
+                <summary class="settings-fold-summary"><h3 class="design-heading">LLM router（对话路由）</h3></summary>
+                <label class="design-label" for="set_api_base_url">API Base URL（接口地址）</label>
+                <input id="set_api_base_url" class="design-input" type="text" spellcheck="false" />
+                <label class="design-label" for="set_api_key">API Key（密钥）</label>
+                <input id="set_api_key" class="design-input" type="password" autocomplete="off" spellcheck="false" placeholder="留空或 ******** 表示不改动" />
+                <label class="design-label" for="set_api_key_env">API Key env（密钥环境变量名）</label>
+                <input id="set_api_key_env" class="design-input" type="text" spellcheck="false" />
+                <label class="design-label" for="set_llm_model">LLM model（大语言模型名）</label>
+                <input id="set_llm_model" class="design-input" type="text" spellcheck="false" />
+                <label class="design-label" for="set_llm_timeout">Timeout（超时秒数）</label>
+                <input id="set_llm_timeout" class="design-input design-input-sm" type="number" min="1" step="1" />
+              </details>
+
+              <details class="design-section settings-fold" open>
+                <summary class="settings-fold-summary"><h3 class="design-heading">任务白名单（仅参考，路由不再强制匹配）</h3></summary>
+                <p class="design-hint">每条英文指令单独填写一行输入框，供对话路由匹配。</p>
+                <div id="set_allowed_tasks" class="task-list" aria-label="任务白名单"></div>
+                <div class="design-actions design-actions-wrap task-list-actions">
+                  <button id="addAllowedTaskBtn" type="button">添加任务</button>
+                </div>
+              </details>
+
+              <details class="design-section settings-fold" open>
+                <summary class="settings-fold-summary"><h3 class="design-heading">场景替换</h3></summary>
+                <p class="hint-text" style="margin:0 0 0.6rem;opacity:0.85;font-size:0.9em;">
+                  切换场景后点「保存并加载」。桌面场景会去掉剑/盾，显示桌子、小圆柱与圆圈标记。
+                </p>
+                <label class="design-label" for="set_scene">Scene（场景）</label>
+                <select id="set_scene" class="design-input">
+                  <option value="free_space">free_space（自由空间）</option>
+                  <option value="reach_sword">reach_sword（抓取剑盾）</option>
+                  <option value="table_place">table_place（桌面放置：圆柱→圆标记）</option>
+                </select>
+                <div id="swordSceneOptions">
+                <label class="design-checkbox">
+                  <input id="set_remove_sword" type="checkbox" />
+                  移除剑（不出现在场景 / 观测中）
+                </label>
+                <label class="design-checkbox">
+                  <input id="set_remove_shield" type="checkbox" />
+                  移除盾牌（不出现在场景 / 观测中）
+                </label>
+                <label class="design-checkbox">
+                  <input id="set_enable_execution_point" type="checkbox" />
+                  启用抓取后执行点（剑柄掠过绿点才算成功）
+                </label>
+                </div>
+                <label class="design-checkbox">
+                  <input id="set_terminate_on_success" type="checkbox" />
+                  terminate_on_success（到位即结束）
+                </label>
+                <div class="generate-row">
+                  <label class="design-label" for="set_max_steps">max_steps（最大步数）</label>
+                  <input id="set_max_steps" class="design-input design-input-sm" type="number" min="1" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="set_n_action_steps">n_action_steps（动作分块步数）</label>
+                  <input id="set_n_action_steps" class="design-input design-input-sm" type="number" min="1" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="set_action_ema">action_ema（动作平滑）</label>
+                  <input id="set_action_ema" class="design-input design-input-sm" type="number" min="0" max="1" step="0.05" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="set_max_action_delta">max_action_delta（最大动作变化）</label>
+                  <input id="set_max_action_delta" class="design-input design-input-sm" type="number" min="0" step="0.01" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="set_reach_success_threshold">reach threshold（到位阈值 m）</label>
+                  <input id="set_reach_success_threshold" class="design-input design-input-sm" type="number" min="0.01" step="0.01" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="set_speed">speed（速度）</label>
+                  <input id="set_speed" class="design-input design-input-sm" type="number" min="0" step="0.1" />
+                </div>
+              </details>
+
+              <details class="design-section settings-fold" open>
+                <summary class="settings-fold-summary"><h3 class="design-heading">外部桥接测试</h3></summary>
+                <p class="design-hint">开启后：本地 MuJoCo 镜像执行，同时把原始关节弧度 chunk 发到对端 HTTP。</p>
+                <label class="design-checkbox">
+                  <input id="set_bridge_enabled" type="checkbox" />
+                  启用外部桥接（本地镜像 + 发送到对端）
+                </label>
+                <label class="design-label" for="set_bridge_base_url">Bridge URL（桥接地址）</label>
+                <input id="set_bridge_base_url" class="design-input" type="text" spellcheck="false" placeholder="http://192.168.10.38:8765" />
+                <div class="generate-row">
+                  <label class="design-label" for="set_bridge_arms">Arms（机械臂）</label>
+                  <select id="set_bridge_arms" class="design-input design-input-sm">
+                    <option value="both">both（双臂）</option>
+                    <option value="right">right（右臂）</option>
+                    <option value="left">left（左臂）</option>
+                  </select>
+                  <label class="design-checkbox bridge-execute">
+                    <input id="set_bridge_execute" type="checkbox" />
+                    execute（执行）
+                  </label>
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="set_bridge_result_timeout_sec">result_timeout_sec（结果超时秒）</label>
+                  <input id="set_bridge_result_timeout_sec" class="design-input design-input-sm" type="number" min="0.1" step="0.5" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="set_bridge_http_timeout_sec">http_timeout_sec（HTTP 超时秒）</label>
+                  <input id="set_bridge_http_timeout_sec" class="design-input design-input-sm" type="number" min="0.1" step="0.5" />
+                </div>
+              </details>
+
+              <div class="design-actions design-actions-wrap">
+                <button id="settingsSaveBtn" class="primary" type="submit">保存并加载</button>
+                <button id="settingsReloadBtn" type="button">重新读取</button>
+              </div>
+              <pre id="settingsStatus" class="generate-status"></pre>
+            </form>
+          </div>
+        </div>
+
+        <div id="swordPanel" class="panel">
+          <div class="design-scroll">
+            <form id="swordForm" class="settings-form">
+              <section class="design-section">
+                <h3 class="design-heading">目标位姿</h3>
+                <p class="design-hint">红点分别为左臂盾牌 / 右臂剑柄的 reach 判定点（世界坐标，米）。姿态角单位为度：偏航绕竖直轴，俯仰/横滚控制倾斜。打开本页会读取当前值；「应用」后重载仿真与画面。</p>
+
+                <h4 class="design-subheading">右侧 · 剑柄红点</h4>
+                <div class="generate-row">
+                  <label class="design-label" for="sword_hx">X（左右）</label>
+                  <input id="sword_hx" class="design-input design-input-sm" type="number" step="0.05" />
+                  <label class="design-label" for="sword_hy">Y（前后）</label>
+                  <input id="sword_hy" class="design-input design-input-sm" type="number" step="0.05" />
+                  <label class="design-label" for="sword_hz">Z（高度）</label>
+                  <input id="sword_hz" class="design-input design-input-sm" type="number" step="0.05" />
+                </div>
+                <h4 class="design-subheading">剑身姿态</h4>
+                <div class="generate-row">
+                  <label class="design-label" for="sword_yaw">偏航°</label>
+                  <input id="sword_yaw" class="design-input design-input-sm" type="number" step="5" />
+                  <label class="design-label" for="sword_pitch">俯仰°</label>
+                  <input id="sword_pitch" class="design-input design-input-sm" type="number" step="5" />
+                  <label class="design-label" for="sword_roll">横滚°</label>
+                  <input id="sword_roll" class="design-input design-input-sm" type="number" step="5" />
+                </div>
+
+                <h4 class="design-subheading">左侧 · 盾牌红点</h4>
+                <div class="generate-row">
+                  <label class="design-label" for="shield_hx">X（左右）</label>
+                  <input id="shield_hx" class="design-input design-input-sm" type="number" step="0.05" />
+                  <label class="design-label" for="shield_hy">Y（前后）</label>
+                  <input id="shield_hy" class="design-input design-input-sm" type="number" step="0.05" />
+                  <label class="design-label" for="shield_hz">Z（高度）</label>
+                  <input id="shield_hz" class="design-input design-input-sm" type="number" step="0.05" />
+                </div>
+                <h4 class="design-subheading">盾牌姿态</h4>
+                <div class="generate-row">
+                  <label class="design-label" for="shield_yaw">偏航°</label>
+                  <input id="shield_yaw" class="design-input design-input-sm" type="number" step="5" />
+                  <label class="design-label" for="shield_pitch">俯仰°</label>
+                  <input id="shield_pitch" class="design-input design-input-sm" type="number" step="5" />
+                  <label class="design-label" for="shield_roll">横滚°</label>
+                  <input id="shield_roll" class="design-input design-input-sm" type="number" step="5" />
+                </div>
+
+                <h4 class="design-subheading">执行点（绿点 · 抓取后掠过）</h4>
+                <p class="design-hint">需在「设置」中勾选启用。成功判定：剑柄红点进入阈值即锁定通过（掠过即算）。</p>
+                <div class="generate-row">
+                  <label class="design-label" for="exec_hx">X（左右）</label>
+                  <input id="exec_hx" class="design-input design-input-sm" type="number" step="0.05" />
+                  <label class="design-label" for="exec_hy">Y（前后）</label>
+                  <input id="exec_hy" class="design-input design-input-sm" type="number" step="0.05" />
+                  <label class="design-label" for="exec_hz">Z（高度）</label>
+                  <input id="exec_hz" class="design-input design-input-sm" type="number" step="0.05" />
+                </div>
+
+                <div class="design-actions design-actions-wrap">
+                  <button id="swordApplyBtn" class="primary" type="submit">应用并重载</button>
+                  <button id="swordReloadBtn" type="button">重新读取当前值</button>
+                  <button id="swordResetBtn" type="button">恢复默认</button>
+                </div>
+                <pre id="swordStatus" class="generate-status"></pre>
+              </section>
+            </form>
+          </div>
+        </div>
+
+        <div id="validatePanel" class="panel">
+          <div class="design-scroll">
+            <section class="design-section">
+              <h3 class="design-heading">验证抓取</h3>
+              <p class="design-hint">
+                训练完成后在此评测策略：每局相对「目标位姿」页当前设置，分别随机偏移剑柄/盾牌红点。需先在「设置」加载 checkpoint，场景为 reach_sword。
+              </p>
+              <pre id="validatePolicyHint" class="generate-status">策略：—</pre>
+              <label class="design-label" for="validate_task">任务指令</label>
+              <input id="validate_task" class="design-input" type="text" spellcheck="false" />
+              <div class="generate-row">
+                <label class="design-label" for="validate_episodes">局数</label>
+                <input id="validate_episodes" class="design-input design-input-sm" type="number" min="1" max="200" value="10" />
+                <label class="design-label" for="validate_max_steps">每局步数</label>
+                <input id="validate_max_steps" class="design-input design-input-sm" type="number" min="1" value="150" />
+                <label class="design-label" for="validate_seed">种子</label>
+                <input id="validate_seed" class="design-input design-input-sm" type="number" value="0" />
+              </div>
+              <h4 class="design-subheading">剑柄红点随机范围 (±m，相对当前剑位姿)</h4>
+              <div class="generate-row">
+                <label class="design-label" for="validate_jx">±X（左右扰动）</label>
+                <input id="validate_jx" class="design-input design-input-sm" type="number" min="0" step="0.01" value="0.15" />
+                <label class="design-label" for="validate_jy">±Y（前后扰动）</label>
+                <input id="validate_jy" class="design-input design-input-sm" type="number" min="0" step="0.01" value="0.12" />
+                <label class="design-label" for="validate_jz">±Z（高度扰动）</label>
+                <input id="validate_jz" class="design-input design-input-sm" type="number" min="0" step="0.01" value="0.08" />
+              </div>
+              <label class="design-checkbox">
+                <input id="validate_rand_euler" type="checkbox" />
+                同时小幅随机剑身姿态 (±15°)
+              </label>
+              <h4 class="design-subheading">盾牌红点随机范围 (±m，相对当前盾位姿)</h4>
+              <div class="generate-row">
+                <label class="design-label" for="validate_shield_jx">±X（左右扰动）</label>
+                <input id="validate_shield_jx" class="design-input design-input-sm" type="number" min="0" step="0.01" value="0.15" />
+                <label class="design-label" for="validate_shield_jy">±Y（前后扰动）</label>
+                <input id="validate_shield_jy" class="design-input design-input-sm" type="number" min="0" step="0.01" value="0.12" />
+                <label class="design-label" for="validate_shield_jz">±Z（高度扰动）</label>
+                <input id="validate_shield_jz" class="design-input design-input-sm" type="number" min="0" step="0.01" value="0.08" />
+              </div>
+              <label class="design-checkbox">
+                <input id="validate_rand_shield_euler" type="checkbox" />
+                同时小幅随机盾牌姿态 (±15°)
+              </label>
+              <div class="design-actions design-actions-wrap">
+                <button id="validateStartBtn" class="primary" type="button">开始验证</button>
+                <button id="validateStopBtn" type="button" disabled>停止</button>
+              </div>
+              <pre id="validateStatus" class="generate-status">尚未开始</pre>
+              <h4 class="design-subheading">每局结果</h4>
+              <pre id="validateResults" class="generate-status">尚无结果</pre>
+            </section>
+          </div>
+        </div>
+
+        <div id="reachIkPanel" class="panel">
+          <div class="design-scroll">
+            <section class="design-section">
+              <h3 class="design-heading">Reach-IK（逆解数据生成）</h3>
+              <p id="rikHintSword" class="design-hint">
+                右臂自动 IK：接近 → 抓取剑柄（单点抓取，不含执行点）。AABB「采样数」= 成功抓取点数；IK 失败会自动重采。JSON 列表中失败点仍会跳过。
+              </p>
+              <p id="rikHintTable" class="design-hint" hidden>
+                桌面放置：圆柱与绿圈位置固定。采样接近高度 / 抬起 / 放置高度，自动 IK 完成夹取→抬起（避开桌面）→移到绿圈上方→松爪落下。仅写入成功落入绿圈的 episode。
+              </p>
+              <div id="rikSwordBlocks">
+              <div class="generate-row">
+                <label class="design-checkbox">
+                  <input id="rik_mode_json" type="radio" name="rik_mode" value="json" checked />
+                  点列表 JSON
+                </label>
+                <label class="design-checkbox">
+                  <input id="rik_mode_bbox" type="radio" name="rik_mode" value="bbox" />
+                  范围采样 AABB
+                </label>
+              </div>
+
+              <div id="rikJsonBlock">
+                <label class="design-label" for="rik_targets_json">targets JSON（目标点列表）</label>
+                <textarea id="rik_targets_json" class="design-input settings-tasks" rows="10" spellcheck="false"></textarea>
+                <div class="design-actions design-actions-wrap">
+                  <button id="rikLoadExampleBtn" type="button">加载示例</button>
+                </div>
+              </div>
+
+              <div id="rikBboxBlock" hidden>
+                <h4 class="design-subheading">AABB（米）</h4>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_bmin_x">min X（最小 X）</label>
+                  <input id="rik_bmin_x" class="design-input design-input-sm" type="number" step="0.05" value="-0.45" />
+                  <label class="design-label" for="rik_bmin_y">min Y（最小 Y）</label>
+                  <input id="rik_bmin_y" class="design-input design-input-sm" type="number" step="0.05" value="-0.65" />
+                  <label class="design-label" for="rik_bmin_z">min Z（最小 Z）</label>
+                  <input id="rik_bmin_z" class="design-input design-input-sm" type="number" step="0.05" value="0.95" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_bmax_x">max X（最大 X）</label>
+                  <input id="rik_bmax_x" class="design-input design-input-sm" type="number" step="0.05" value="-0.20" />
+                  <label class="design-label" for="rik_bmax_y">max Y（最大 Y）</label>
+                  <input id="rik_bmax_y" class="design-input design-input-sm" type="number" step="0.05" value="-0.40" />
+                  <label class="design-label" for="rik_bmax_z">max Z（最大 Z）</label>
+                  <input id="rik_bmax_z" class="design-input design-input-sm" type="number" step="0.05" value="1.15" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_num_targets">成功采样数</label>
+                  <input id="rik_num_targets" class="design-input design-input-sm" type="number" min="1" value="20" />
+                </div>
+              </div>
+              </div>
+
+              <div id="rikTablePlaceBlock" hidden>
+                <h4 class="design-subheading">桌面抓放参数</h4>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_tp_num_episodes">成功局数</label>
+                  <input id="rik_tp_num_episodes" class="design-input design-input-sm" type="number" min="1" value="20" />
+                  <label class="design-label" for="rik_tp_clearance">抬起净空 (m)</label>
+                  <input id="rik_tp_clearance" class="design-input design-input-sm" type="number" step="0.005" min="0" value="0.01" />
+                  <label class="design-label" for="rik_tp_settle">settle 步数</label>
+                  <input id="rik_tp_settle" class="design-input design-input-sm" type="number" min="1" value="30" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_tp_approach_min">接近高度 min</label>
+                  <input id="rik_tp_approach_min" class="design-input design-input-sm" type="number" step="0.01" value="0.04" />
+                  <label class="design-label" for="rik_tp_approach_max">接近高度 max</label>
+                  <input id="rik_tp_approach_max" class="design-input design-input-sm" type="number" step="0.01" value="0.10" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_tp_lift_min">抬起 Z min</label>
+                  <input id="rik_tp_lift_min" class="design-input design-input-sm" type="number" step="0.01" value="0.905" />
+                  <label class="design-label" for="rik_tp_lift_max">抬起 Z max</label>
+                  <input id="rik_tp_lift_max" class="design-input design-input-sm" type="number" step="0.01" value="0.985" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_tp_place_min">放置 Z min</label>
+                  <input id="rik_tp_place_min" class="design-input design-input-sm" type="number" step="0.01" value="0.895" />
+                  <label class="design-label" for="rik_tp_place_max">放置 Z max</label>
+                  <input id="rik_tp_place_max" class="design-input design-input-sm" type="number" step="0.01" value="0.975" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-checkbox">
+                    <input id="rik_tp_sample_peg" type="checkbox" checked />
+                    随机圆柱位置（多点训练数据，限制在工作区内）
+                  </label>
+                  <label class="design-checkbox">
+                    <input id="rik_tp_append" type="checkbox" />
+                    续写已有数据集（不覆盖）
+                  </label>
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_tp_peg_xmin">圆柱 X min</label>
+                  <input id="rik_tp_peg_xmin" class="design-input design-input-sm" type="number" step="0.01" value="-0.30" />
+                  <label class="design-label" for="rik_tp_peg_xmax">圆柱 X max</label>
+                  <input id="rik_tp_peg_xmax" class="design-input design-input-sm" type="number" step="0.01" value="0.08" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_tp_peg_ymin">圆柱 Y min</label>
+                  <input id="rik_tp_peg_ymin" class="design-input design-input-sm" type="number" step="0.01" value="-0.70" />
+                  <label class="design-label" for="rik_tp_peg_ymax">圆柱 Y max</label>
+                  <input id="rik_tp_peg_ymax" class="design-input design-input-sm" type="number" step="0.01" value="-0.50" />
+                </div>
+                <div class="generate-row">
+                  <label class="design-label" for="rik_tp_peg_margin">桌边内缩 (m)</label>
+                  <input id="rik_tp_peg_margin" class="design-input design-input-sm" type="number" step="0.005" min="0" value="0.05" />
+                  <label class="design-label" for="rik_tp_episodes_per_peg">每目标轨迹数</label>
+                  <input id="rik_tp_episodes_per_peg" class="design-input design-input-sm" type="number" min="1" value="2" />
+                </div>
+              </div>
+
+              <h4 class="design-subheading">共用参数</h4>
+              <div class="generate-row">
+                <label class="design-label" for="rik_episodes">每目标局数</label>
+                <input id="rik_episodes" class="design-input design-input-sm" type="number" min="1" value="1" />
+                <label class="design-label" for="rik_segment">segment（移动段步数）</label>
+                <input id="rik_segment" class="design-input design-input-sm" type="number" min="1" value="20" />
+                <label class="design-label" for="rik_hold">hold（保持步数）</label>
+                <input id="rik_hold" class="design-input design-input-sm" type="number" min="0" value="2" />
+                <label class="design-label" for="rik_seed">种子</label>
+                <input id="rik_seed" class="design-input design-input-sm" type="number" value="0" />
+              </div>
+              <div class="generate-row">
+                <label class="design-label" for="rik_output_name">输出名</label>
+                <input id="rik_output_name" class="design-input" type="text" value="reach_ik_web" spellcheck="false" />
+                <label class="design-checkbox">
+                  <input id="rik_overwrite" type="checkbox" />
+                  overwrite（覆盖）
+                </label>
+              </div>
+              <div class="design-actions design-actions-wrap">
+                <button id="rikGenerateBtn" class="primary" type="button">开始生成</button>
+              </div>
+              <pre id="rikGenerateStatus" class="generate-status">尚未开始</pre>
+            </section>
+
+            <section class="design-section">
+              <h3 class="design-heading">数据集回放</h3>
+              <p class="design-hint">
+                从所选 Episode 起顺序播完；每集开始时左侧场景把剑+红点放到该集采集点。可随时停止。生成完成后点「刷新列表」。
+              </p>
+              <div class="design-actions design-actions-wrap">
+                <button id="rikRefreshDatasetsBtn" type="button">刷新列表</button>
+              </div>
+              <label class="design-label" for="rik_dataset_select">数据集</label>
+              <select id="rik_dataset_select" class="design-input"></select>
+              <div class="generate-row">
+                <label class="design-label" for="rik_episode">Episode（回放起始局）</label>
+                <input id="rik_episode" class="design-input design-input-sm" type="number" min="0" value="0" />
+                <label class="design-label" for="rik_speed">速度</label>
+                <input id="rik_speed" class="design-input design-input-sm" type="number" min="0.1" step="0.1" value="1.0" />
+              </div>
+              <div class="design-actions design-actions-wrap">
+                <button id="rikPlayBtn" class="primary" type="button">播放</button>
+                <button id="rikPauseBtn" type="button">暂停</button>
+                <button id="rikStopBtn" type="button">停止</button>
+              </div>
+              <pre id="rikReplayStatus" class="generate-status">尚未回放</pre>
+            </section>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/static/vendor/three/three.module.js",
+      "three/": "/static/vendor/three/",
+      "urdf-loader": "/static/vendor/urdf-loader/URDFLoader.js"
+    }
+  }
+  </script>
+  <link rel="icon" href="data:," />
+  <script type="module" src="/static/js/main.js?v=tableplace1"></script>
+</body>
+</html>
