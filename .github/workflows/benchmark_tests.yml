@@ -22,32 +22,10 @@
 name: Benchmark Integration Tests
 
 on:
-  # Run manually from the Actions tab
+  # Upstream benchmark jobs require Hugging Face's private GPU runner groups
+  # and organization secrets. Keep them available for explicit/manual runs,
+  # but do not fail normal pushes in this standalone Unoarm repository.
   workflow_dispatch:
-
-  # Run every Monday at 02:00 UTC.
-  schedule:
-    - cron: "0 2 * * 1"
-
-  push:
-    branches:
-      - main
-    paths:
-      - "src/lerobot/envs/**"
-      - "src/lerobot/scripts/lerobot_eval.py"
-      - "docker/Dockerfile.benchmark.*"
-      - ".github/workflows/benchmark_tests.yml"
-      - "pyproject.toml"
-
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "src/lerobot/envs/**"
-      - "src/lerobot/scripts/lerobot_eval.py"
-      - "docker/Dockerfile.benchmark.*"
-      - ".github/workflows/benchmark_tests.yml"
-      - "pyproject.toml"
 
 permissions:
   contents: read
