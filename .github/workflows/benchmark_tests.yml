@@ -22,9 +22,7 @@
 name: Benchmark Integration Tests
 
 on:
-  # Upstream benchmark jobs require Hugging Face's private GPU runner groups
-  # and organization secrets. Keep them available for explicit/manual runs,
-  # but do not fail normal pushes in this standalone Unoarm repository.
+  # All workflows are opt-in for this standalone repository.
   workflow_dispatch:
 
 permissions:

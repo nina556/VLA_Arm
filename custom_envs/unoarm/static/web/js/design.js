@@ -583,7 +583,7 @@ export function setupDesignHandlers({
   };
 
   buildJointSliders();
-  window.addEventListener("unoarm:arm-side", (event) => {
+  window.addEventListener("robot:arm-side", (event) => {
     setActiveArmSide(event.detail?.side);
   });
 

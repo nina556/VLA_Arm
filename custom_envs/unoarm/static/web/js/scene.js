@@ -46,7 +46,6 @@ export class RobotScene {
     this.addGround();
     this.setDefaultView();
     this.loadRobot();
-    this.loadUnoLogo();
     this.resize();
     window.addEventListener("resize", () => this.resize());
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
@@ -96,9 +95,6 @@ export class RobotScene {
     this.beamGroup = new THREE.Group();
     this.beamGroup.name = "VolumetricBeams";
     this.scene.add(this.beamGroup);
-    this.unoLightRig = new THREE.Group();
-    this.unoLightRig.name = "UnoLightBar";
-    this.scene.add(this.unoLightRig);
 
     const robotAim = new THREE.Vector3(0, 1.05, 0);
     const robotSpots = [
@@ -142,10 +138,8 @@ export class RobotScene {
     this.setDayLightsLevel(1);
     this.setNightFillLevel(0);
     this.setRobotLightsLevel(0);
-    this.setUnoLightsLevel(0);
     this.dayLightGroup.visible = true;
     this.beamGroup.visible = false;
-    this.unoLightRig.visible = false;
     this.scene.background.copy(this._bgDay);
     this.renderer.toneMappingExposure = 1.18;
     this.setBlackout(0);
@@ -159,9 +153,7 @@ export class RobotScene {
     this.dayLightGroup.visible = false;
     this.setNightFillLevel(1);
     this.setRobotLightsLevel(1);
-    this.setUnoLightsLevel(1);
     this.beamGroup.visible = true;
-    this.unoLightRig.visible = true;
     this.scene.background.copy(this._bgNight);
     this.renderer.toneMappingExposure = 1.05;
     this.setBlackout(0);
@@ -194,26 +186,6 @@ export class RobotScene {
           obj.material.opacity = obj.userData.baseOpacity * t;
         }
       });
-    });
-  }
-
-  setUnoLightsLevel(t) {
-    if (!this.unoLightRig) return;
-    this.unoLightRig.traverse((obj) => {
-      if (obj.isSpotLight) {
-        const base = obj.userData.baseIntensity ?? 28;
-        obj.intensity = base * t;
-        obj.visible = t > 0.001;
-      }
-      if (obj.isMesh && obj.material) {
-        if (obj.userData.baseOpacity != null) {
-          obj.material.opacity = obj.userData.baseOpacity * t;
-          obj.visible = t > 0.001;
-        }
-        if (obj.material.emissiveIntensity != null && obj.userData.baseEmissive != null) {
-          obj.material.emissiveIntensity = obj.userData.baseEmissive * t;
-        }
-      }
     });
   }
 
@@ -302,10 +274,8 @@ export class RobotScene {
     this.dayLightGroup.visible = false;
     this.setDayLightsLevel(0);
     this.beamGroup.visible = true;
-    this.unoLightRig.visible = true;
     this.setNightFillLevel(0);
     this.setRobotLightsLevel(0);
-    this.setUnoLightsLevel(0);
     this.scene.background.copy(this._bgNight);
 
     // 2) Reveal the black stage.
@@ -315,17 +285,7 @@ export class RobotScene {
     this.setBlackout(0);
     await this.sleep(180);
 
-    // 3) Rear light bar bursts onto the Uno letters.
-    await this.animateValue(480, (u) => {
-      const burst = Math.min(1, this.easeOutBack(Math.min(1, u * 1.05)));
-      this.setUnoLightsLevel(Math.max(0, burst));
-      this.setNightFillLevel(0.25 * this.easeOutCubic(u));
-      this.renderer.toneMappingExposure = 0.25 + 0.55 * this.easeOutCubic(u);
-    });
-    this.setUnoLightsLevel(1);
-    await this.sleep(320);
-
-    // 4) Three soft circular spots open on the mecha.
+    // 3) Three soft circular spots open on the mecha.
     await this.animateValue(520, (u) => {
       const e = this.easeOutCubic(u);
       this.setRobotLightsLevel(e);
@@ -341,12 +301,10 @@ export class RobotScene {
     await this.animateValue(500, (u) => {
       const e = this.easeInOut(u);
       this.setRobotLightsLevel(1 - e);
-      this.setUnoLightsLevel(1 - e);
       this.setNightFillLevel(1 - e);
       this.setBlackout(e * 0.55);
     });
     this.beamGroup.visible = false;
-    this.unoLightRig.visible = false;
     this.dayLightGroup.visible = true;
     this.setDayLightsLevel(0);
 
@@ -487,100 +445,6 @@ export class RobotScene {
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
   }
 
-  /**
-   * Horizontal row of warm lights above the Uno logo, each casting a downward shaft.
-   */
-  setupUnoLightBar(mesh) {
-    while (this.unoLightRig.children.length) {
-      const child = this.unoLightRig.children[0];
-      this.unoLightRig.remove(child);
-      child.traverse?.((o) => {
-        if (o.geometry) o.geometry.dispose?.();
-      });
-    }
-
-    mesh.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(mesh);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const y = box.max.y + 0.55;
-    const z = center.z;
-    const halfW = size.x * 0.42;
-    const count = 6;
-    const color = 0xffd56a;
-
-    // Physical light bar housing
-    const bar = new THREE.Mesh(
-      new THREE.BoxGeometry(size.x * 0.92, 0.06, 0.12),
-      new THREE.MeshStandardMaterial({
-        color: 0x2a2418,
-        metalness: 0.7,
-        roughness: 0.35,
-        emissive: 0x664410,
-        emissiveIntensity: 0.55,
-      })
-    );
-    bar.position.set(center.x, y, z);
-    bar.userData.baseEmissive = 0.55;
-    this.unoLightRig.add(bar);
-
-    for (let i = 0; i < count; i += 1) {
-      const t = count === 1 ? 0.5 : i / (count - 1);
-      const x = center.x - halfW + t * halfW * 2;
-      const from = new THREE.Vector3(x, y - 0.02, z);
-      const to = new THREE.Vector3(x, Math.max(0.05, box.min.y + 0.08), z);
-
-      const spot = new THREE.SpotLight(color, 28, 6, Math.PI / 9, 0.55, 1.7);
-      spot.position.copy(from);
-      spot.target.position.copy(to);
-      spot.userData.baseIntensity = 28;
-      this.unoLightRig.add(spot);
-      this.unoLightRig.add(spot.target);
-
-      // Round lamp lens on the bar
-      const lens = new THREE.Mesh(
-        new THREE.SphereGeometry(0.045, 12, 12),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 1,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-        })
-      );
-      lens.userData.baseOpacity = 1;
-      lens.position.copy(from);
-      this.unoLightRig.add(lens);
-
-      // Visible downward cone: point at the lamp → circular pool on the logo.
-      const cone = this.createCircularBeam({
-        color,
-        from,
-        to,
-        angle: Math.PI / 12,
-        opacity: 0.26,
-      });
-      // Lens already marks the lamp; drop the extra bulb.
-      if (cone.userData.bulb) {
-        cone.remove(cone.userData.bulb);
-      }
-      this.unoLightRig.add(cone);
-    }
-
-    // Match current time-of-day (logo may load after day look is applied).
-    if (this.timeOfDay === "day") {
-      this.setUnoLightsLevel(0);
-      this.unoLightRig.visible = false;
-    } else {
-      this.setUnoLightsLevel(1);
-      this.unoLightRig.visible = true;
-    }
-  }
-
-  aimUnoLogoSpot(mesh) {
-    this.setupUnoLightBar(mesh);
-  }
-
   addGround() {
     // Shrink by 1/3 → keep 2/3 of original size.
     const s = 2 / 3;
@@ -599,9 +463,8 @@ export class RobotScene {
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.002;
     ground.receiveShadow = true;
-    ground.name = "LogoGround";
+    ground.name = "Ground";
     this.scene.add(ground);
-    this._logoGround = ground;
 
     // Soft outer ring so the disc doesn't float over empty void.
     const apron = new THREE.Mesh(
@@ -618,85 +481,6 @@ export class RobotScene {
     apron.receiveShadow = true;
     this.scene.add(apron);
 
-    const loader = new THREE.TextureLoader();
-    const logoUrl = "/static/logo.png?v=2";
-    loader.load(
-      logoUrl,
-      (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.anisotropy = Math.min(8, this.renderer?.capabilities?.getMaxAnisotropy?.() || 8);
-        texture.needsUpdate = true;
-        groundMat.map = texture;
-        groundMat.color.set(0xffffff);
-        groundMat.needsUpdate = true;
-      },
-      undefined,
-      (err) => {
-        console.error("logo.png 加载失败", err);
-        // Fallback to repo data mount.
-        loader.load(
-          "/assets/logo.png?v=2",
-          (texture) => {
-            texture.colorSpace = THREE.SRGBColorSpace;
-            texture.needsUpdate = true;
-            groundMat.map = texture;
-            groundMat.color.set(0xffffff);
-            groundMat.needsUpdate = true;
-          },
-          undefined,
-          (err2) => {
-            console.error("logo.png fallback 也失败", err2);
-            this.onSystemMessage(`底座 logo 贴图加载失败: ${err2?.message || err2}`);
-          }
-        );
-      }
-    );
-  }
-
-  loadUnoLogo() {
-    const url = "/urdf/meshes/Uno.stl?v=1";
-    const loader = new STLLoader();
-    loader.load(
-      url,
-      (geometry) => {
-        geometry.computeVertexNormals();
-        const material = new THREE.MeshPhysicalMaterial({
-          color: 0xd4af37,
-          metalness: 0.92,
-          roughness: 0.22,
-          clearcoat: 0.55,
-          clearcoatRoughness: 0.18,
-          reflectivity: 1.0,
-          side: THREE.DoubleSide,
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.name = "UnoLogo";
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-
-        // Shrink by 1/3 with the ground disc (keep 2/3).
-        const s = 2 / 3;
-        mesh.scale.setScalar(s);
-        // STL is already upright in XY (thin in Z). Face the default camera (+Z).
-        mesh.rotation.y = 0;
-        mesh.updateMatrixWorld(true);
-
-        const box = new THREE.Box3().setFromObject(mesh);
-        const center = box.getCenter(new THREE.Vector3());
-        // Sit on the floor, centered on X, behind the robot (farther -Z).
-        const backZ = -2.8 * s;
-        mesh.position.set(-center.x, -box.min.y, backZ - box.max.z);
-        mesh.updateMatrixWorld(true);
-
-        this.scene.add(mesh);
-        this.aimUnoLogoSpot(mesh);
-      },
-      undefined,
-      (err) => {
-        console.error("Uno.stl 加载失败", err);
-        this.onSystemMessage(`Uno logo 加载失败: ${err?.message || err}`);
-      }
-    );
   }
 
   /**
@@ -1431,7 +1215,7 @@ export class RobotScene {
   }
 
   async loadRobot() {
-    const urdfUrl = "/urdf/unoarm_mujoco.urdf?v=mecha8";
+    const urdfUrl = "/robot/model.urdf?v=mecha8";
     const sampleMesh = "/urdf/meshes/meshes__mecha_body.stl?v=mecha8";
     try {
       const urdfCheck = await fetch(urdfUrl);
@@ -1452,7 +1236,7 @@ export class RobotScene {
 
     manager.onProgress = (_url, loaded, total) => {
       this.loadState.querySelector("span:last-child").textContent =
-        `正在加载 UnoArm URDF ${loaded}/${total}`;
+        `正在加载机器人模型 ${loaded}/${total}`;
     };
 
     manager.onError = (url) => {
@@ -1499,7 +1283,7 @@ export class RobotScene {
       urdfUrl,
       (robot) => {
         this.robot = robot;
-        robot.name = "UnoArmURDF";
+        robot.name = "RobotURDF";
         robot.rotation.set(0, 0, 0);
         robot.scale.setScalar(1);
         this.applyTechMaterials();

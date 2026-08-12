@@ -1,585 +1,781 @@
-# Unoarm × LeRobot：双臂机器人 VLA 仿真、数据与交互平台
+# 双臂机器人 VLA 仿真、数据与交互平台
 
-基于 [LeRobot](https://github.com/huggingface/lerobot) 构建的 **Unoarm 双臂机器人**端到端 VLA（Vision-Language-Action）实验平台，覆盖 MuJoCo 仿真、关键帧与 IK 数据生成、数据回放、SmolVLA/ACT 训练评估，以及由 LLM 路由的 Web 交互控制。
+本项目是一套面向双臂机器人研究与工程验证的端到端 Vision-Language-Action（VLA）平台。它以 LeRobot 为训练和数据基础设施，以 MuJoCo 构建可复现仿真环境，并提供关键帧、逆运动学、数据集、策略训练、评估、自然语言交互和浏览器三维可视化能力。
 
-Unoarm 的自定义能力集中在 `custom_envs/unoarm/`，以可编辑 Python 包接入 LeRobot，无需侵入其核心实现。目前内置自由空间、抓剑和桌面抓取放置场景，并提供终端与浏览器两套交互入口。
+项目希望解决的不是单一演示，而是打通以下完整闭环：
 
-> **English summary:** An end-to-end VLA experimentation platform for the Unoarm dual-arm robot, combining MuJoCo simulation, LeRobot, scripted and IK-based data generation, policy training, and LLM-routed web interaction.
-
-> **环境安装**：见 [REQUIREMENTS.md](./REQUIREMENTS.md)（含完整踩坑记录：bazel、JDK、HF 镜像、相机 rename 等）。
-
-> **VLA 技术综述**：仓库内提供配套资料 [《VLA 各系列综述》](./VLA各系列综述.pdf)，可用于了解 Vision-Language-Action 模型的发展脉络、主要系列和技术背景。
-
----
-
-## 目录
-
-- [架构概览](#架构概览)
-- [VLA 综述](#vla-综述)
-- [快速开始](#快速开始)
-- [详细工作流](#详细工作流)
-  - [1. 环境安装](#1-环境安装)
-  - [2. 仿真环境介绍](#2-仿真环境介绍)
-  - [3. 数据采集（手动 teleop，可选）](#3-数据采集手动-teleop可选)
-  - [4. 脚本化数据生成（推荐）](#4-脚本化数据生成推荐)
-  - [5. 数据回放检验](#5-数据回放检验)
-  - [6. 开始 SmolVLA 训练](#6-开始-smolvla-训练)
-  - [7. 训练后可视化验证](#7-训练后可视化验证)
-- [Web 控制台与扩展场景](#web-控制台与扩展场景)
-  - [Web 控制台](#web-控制台)
-  - [Reach-IK 抓剑数据](#reach-ik-抓剑数据)
-  - [桌面抓取放置](#桌面抓取放置)
-- [目录结构](#目录结构)
-- [常见问题](#常见问题)
-
----
-
-## 架构概览
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    custom_envs/unoarm/                       │
-│                                                              │
-│  gym_unoarm/         MuJoCo + Gymnasium 仿真环境             │
-│    ├─ env.py         UnoarmEnv（16D 双臂 action/state）      │
-│    ├─ ik.py          MuJoCo DLS 逆运动学                     │
-│    ├─ *_scene.py     抓剑 / 桌面放置场景                     │
-│    └─ *.xml + meshes 机器人、相机与场景资产                  │
-│                                                              │
-│  lerobot_unoarm/     LeRobot EnvConfig 注册（--env.type=unoarm）│
-│                                                              │
-│  data_gen/           关键帧 / Reach-IK / Table-Place 数据生成│
-│  pose_design/        动作工程、关键帧编排与导出              │
-│  webapp/ + static/   FastAPI 后端与浏览器 3D 控制台          │
-│  data/               动作设计、设置与生成的数据集            │
-│                                                              │
-│  scripts/            工作流脚本                              │
-│    ├─ 01_convert_urdf_to_mjcf.py   URDF→MJCF 转换            │
-│    ├─ 06_generate_scripted_data.py 脚本化数据生成（主入口）  │
-│    ├─ 07_replay_dataset.py          数据回放可视化            │
-│    ├─ 08_interact.py                终端交互推理              │
-│    ├─ 09_web_interact.py            Web 控制台                │
-│    └─ 10_generate_reach_ik_data.py  Reach-IK 数据生成         │
-└─────────────────────────────────────────────────────────────┘
-          │
-          │ uv pip install -e custom_envs/unoarm
-          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       LeRobot 基础设施                        │
-│  unoarm-train / eval  +  SmolVLA / ACT policies              │
-└─────────────────────────────────────────────────────────────┘
+```text
+任务定义 → 场景构建 → 轨迹生成 → 数据检查 → 策略训练
+    → 离线评估 → 交互推理 → 仿真或远端执行 → 结果分析
 ```
 
-**核心设计**：自定义包通过 `uv pip install -e` 装入 `.venv`，注册 `--env.type=unoarm`、`gym_unoarm/UnoarmFreeSpace-v0` 和 `gym_unoarm/UnoarmReachSword-v0`，从而复用 LeRobot 的数据、训练和推理基础设施。桌面放置场景由同一个 `UnoarmEnv` 通过 `scene=table_place` 启用。
+本文适合项目使用者、算法工程师、机器人开发者和后续维护人员阅读。
+
+> 完整环境安装和已知依赖问题见 [REQUIREMENTS.md](./REQUIREMENTS.md)。
+>
+> VLA 技术背景可参考仓库附带的 [《VLA 各系列综述》](./VLA各系列综述.pdf)。
 
 ---
 
-## VLA 综述
+## 1. 项目能力概览
 
-本项目附带 [《VLA 各系列综述》](./VLA各系列综述.pdf)，作为理解项目技术选型的背景资料。建议在运行训练流程前阅读，以建立对 VLA 模型及其在机器人感知、语言理解与动作生成中作用的整体认识。
+### 1.1 仿真与控制
+
+- 基于 MuJoCo 的双臂机器人、夹爪、相机和任务道具仿真
+- Gymnasium 风格的环境接口，可接入 LeRobot 训练和评估
+- 16 维动作与状态：左右臂各 7 个关节，加左右夹爪
+- 20 Hz 控制频率，时间步长 0.05 秒
+- 顶视、左腕、右腕三路 RGB 观测，每路 480×640
+- 支持确定性运动学执行，也支持任务物体附着、释放和掉落逻辑
+
+### 1.2 场景与任务
+
+当前实现包含三类主要场景：
+
+| 场景 | 目标 | 典型用途 |
+| --- | --- | --- |
+| 自由空间 | 根据语言完成双臂姿态或动作序列 | 动作模仿、关键帧数据、基础 VLA 微调 |
+| 双目标抓取 | 左右臂分别接近并抓取指定道具 | 双臂协同、Reach-IK、目标到达验证 |
+| 桌面抓取放置 | 抓起圆柱并放到目标区域 | 物体操作、ACT/VLA 训练、成功率评估 |
+
+### 1.3 数据与学习
+
+- 键盘遥操作录制
+- JSON 关键帧轨迹生成
+- Damped Least Squares（DLS）逆运动学数据生成
+- 工作空间随机采样和场景随机化
+- 标准 LeRobotDataset 数据格式
+- 数据集回放、状态误差检查和视频验证
+- SmolVLA、ACT 等策略训练与 checkpoint 管理
+- 终端交互推理和网页交互推理
+
+### 1.4 网页控制台
+
+- Three.js 三维机器人场景
+- 三路训练相机预览
+- 对话式任务路由
+- 16 关节姿态编辑器
+- 关键帧库和动作播放列表
+- Reach-IK 数据生成
+- 数据集浏览和回放
+- checkpoint、设备、场景和推理参数配置
+- WebSocket 实时状态流
+- 可选远端执行桥接
 
 ---
 
-## 快速开始
+## 2. 技术支撑综述
 
-假设环境已装好（见 [REQUIREMENTS.md](./REQUIREMENTS.md)），下面四步可跑通基础的“数据—训练—推理”闭环：
+### 2.1 Vision-Language-Action
+
+VLA 模型把视觉观测、语言任务和机器人动作统一到一个条件生成问题中：
+
+```text
+图像观测 + 机器人状态 + 语言指令 → 动作序列
+```
+
+相较于只接收状态的传统控制器，VLA 可以使用自然语言区分任务；相较于只做视觉问答的多模态模型，它必须输出能在物理系统中执行的连续控制量。本项目围绕 VLA 落地最关键的四个环节构建支撑：
+
+1. 保证观测、状态和动作定义稳定。
+2. 以可复现方式生成语言条件轨迹。
+3. 在训练前通过回放检查数据质量。
+4. 在推理时处理动作分块、平滑、限幅和执行互斥。
+
+仓库附带的综述文档进一步介绍了主要 VLA 路线、视觉语言骨干、动作表示和机器人数据问题。
+
+### 2.2 行为克隆与 ACT
+
+行为克隆学习示范数据中的条件映射：
+
+```text
+π(a | o, l)
+```
+
+其中 `o` 是视觉和机器人状态，`l` 是语言任务，`a` 是动作。ACT 使用动作分块预测一段未来动作，可降低逐步预测带来的累积误差。项目的网页运行参数包含动作步数、指数平滑和最大动作变化量，可在策略输出与执行端之间增加安全约束。
+
+### 2.3 MuJoCo 与 Gymnasium
+
+MuJoCo 负责机器人运动学、几何、相机和任务物体状态。Gymnasium 接口把环境统一为 `reset`、`step`、观测空间和动作空间，使同一环境可用于数据生成、训练评估和交互推理。
+
+自由空间行为任务主要采用确定性运动学更新：动作写入关节状态后调用前向运动学。这种方式牺牲部分动力学真实性，但能显著提高示范生成和回放的一致性。涉及桌面物体操作的场景则补充抓取附着、释放和掉落等任务逻辑。
+
+### 2.4 逆运动学
+
+Reach 数据生成采用 DLS 逆运动学。其基本形式为：
+
+```text
+Δq = Jᵀ (J Jᵀ + λ²I)⁻¹ e
+```
+
+其中 `J` 是末端雅可比矩阵，`e` 是目标位姿误差，`λ` 是阻尼项。阻尼可以缓解奇异位姿附近的数值不稳定。生成器将目标点、TCP 偏移、接近段、抓取段和后续执行点组合为关键路径，再插值为可训练轨迹。
+
+### 2.5 LeRobotDataset
+
+数据以 episode 为基本单元，包含：
+
+- 三路 RGB 图像
+- 16 维机器人状态
+- 16 维动作
+- 时间戳、帧索引和 episode 索引
+- 语言任务
+- 可选场景目标与生成元数据
+
+训练前必须保证相机键、状态维度、动作维度和语言字段与策略配置一致。项目提供数据回放脚本验证环境能否用数据中的动作重现录制状态。
+
+### 2.6 Web 技术
+
+后端采用 FastAPI，负责 REST API、设置持久化、数据生成任务、策略生命周期和 WebSocket 状态推送。前端采用原生 JavaScript 与 Three.js，加载 URDF/STL 模型并展示关节、道具、目标点、相机图像和运行状态。
+
+LLM 路由器使用 OpenAI-compatible 接口，把输入区分为闲聊或机器人任务；只有命中允许任务列表的请求才进入策略执行流程。
+
+---
+
+## 3. 总体架构
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                         浏览器控制台                         │
+│  对话 │ 动作设计 │ 目标位姿 │ Reach-IK │ 验证 │ 设置       │
+│  Three.js 场景 │ 相机预览 │ WebSocket 实时状态              │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ HTTP / WebSocket
+┌──────────────────────────────▼───────────────────────────────┐
+│                        FastAPI 应用层                         │
+│  模式互斥 │ 设置存储 │ LLM 路由 │ 数据任务 │ 策略 Runner   │
+└───────────────┬──────────────────────────────┬───────────────┘
+                │                              │
+┌───────────────▼────────────────┐  ┌──────────▼───────────────┐
+│        仿真与任务环境           │  │      策略与数据层         │
+│ MuJoCo │ Gymnasium │ DLS IK    │  │ LeRobotDataset           │
+│ 三相机 │ 16D 控制 │ 场景逻辑   │  │ SmolVLA / ACT            │
+└───────────────┬────────────────┘  │ 预处理 / 后处理 / 评估    │
+                │                   └──────────┬───────────────┘
+                └──────────────────────────────┤
+                                               ▼
+                                  可选远端执行桥接 / 实体系统
+```
+
+### 3.1 分层职责
+
+| 层 | 职责 |
+| --- | --- |
+| 资产层 | URDF、MJCF、STL、关节限制、相机和任务道具 |
+| 环境层 | reset/step、渲染、状态归一化、成功判定、物体逻辑 |
+| 数据层 | 关键帧插值、随机化、IK、episode 写入、元数据 |
+| 策略层 | 特征映射、模型加载、动作分块、平滑与限幅 |
+| 服务层 | 模式管理、后台任务、设置、LLM 路由和远端桥接 |
+| 展示层 | 三维场景、相机画面、表单、日志和验证结果 |
+
+### 3.2 核心数据流
+
+```text
+场景 reset
+   ↓
+三路图像 + 16D state + language
+   ↓
+策略预处理与相机键映射
+   ↓
+策略输出动作块
+   ↓
+后处理、EMA 平滑、变化量限制
+   ↓
+16D action 写入环境
+   ↓
+新观测、任务指标、WebSocket 快照
+```
+
+---
+
+## 4. 代码组织
+
+为避免在文档中暴露历史品牌标识，下面使用环境变量定位自定义环境目录：
 
 ```bash
-# 1. 生成 30 episodes 训练数据（约 50 秒）
-uv run python custom_envs/unoarm/scripts/06_generate_scripted_data.py \
-  --episodes 30 --segment-steps 20 --hold-steps 5 \
-  --midpoint-noise-std 0.02 --hold-noise-std 0.01 --pose-jitter-std 0.05 \
-  --output-root custom_envs/unoarm/data/unoarm_prepare_fight_taunt \
-  --repo-id doki/unoarm_prepare_fight_taunt --overwrite
-
-# 2. 回放检验数据对不对（开 MuJoCo viewer 看机器人动作）
-uv run python custom_envs/unoarm/scripts/07_replay_dataset.py --episode 0
-
-# 3. 训练 SmolVLA（约 8 小时 / 20k 步 / 单卡）
-DEVICE=cuda uv run unoarm-train \
-  --policy.path=lerobot/smolvla_base \
-  --rename_map='{"observation.images.top":"observation.images.camera1","observation.images.left_wrist":"observation.images.camera2","observation.images.right_wrist":"observation.images.camera3"}' \
-  --env.type=unoarm --env.task=UnoarmFreeSpace-v0 \
-  --dataset.repo_id=doki/unoarm_prepare_fight_taunt \
-  --dataset.root=custom_envs/unoarm/data/unoarm_prepare_fight_taunt \
-  --batch_size=4 --steps=20000 \
-  --eval_steps=0 --eval.use_async_envs=false --eval.batch_size=1 \
-  --policy.push_to_hub=false \
-  --output_dir=data/outputs/smolvla_unoarm
-
-# 4. 训练完，交互式推理看效果（输入语言指令 → 机器人执行）
-uv run python custom_envs/unoarm/scripts/08_interact.py
+export ROBOT_ENV_DIR="$(find custom_envs -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 ```
 
-也可以启动集成式 Web 控制台，在浏览器中完成对话控制、动作设计、IK 数据生成和数据集回放：
+主要目录如下：
 
-```bash
-uv run python custom_envs/unoarm/scripts/09_web_interact.py
+```text
+.
+├── README.md
+├── REQUIREMENTS.md
+├── VLA各系列综述.pdf
+├── pyproject.toml
+├── uv.lock
+├── src/                         # LeRobot 核心实现
+├── tests/                       # 上游与集成测试
+├── docs/                        # 设计、规格和开发记录
+├── custom_envs/
+│   └── <机器人环境目录>/
+│       ├── gym_*/               # MuJoCo/Gymnasium 环境与资产
+│       ├── lerobot_*/           # LeRobot 环境注册和命令包装
+│       ├── data_gen/            # 脚本轨迹、Reach-IK、桌面放置生成
+│       ├── pose_design/         # 动作工程、关键帧、导出和预览
+│       ├── webapp/              # FastAPI、Runner、设置和桥接
+│       ├── static/web/          # HTML/CSS/JavaScript 前端
+│       ├── scripts/             # 各工作流入口
+│       ├── tests/               # 环境、IK、数据与 Web 测试
+│       └── data/                # 本地设置、动作工程和生成数据
+└── data/outputs/                # 训练输出
 ```
 
-下面逐节展开说明。
+脚本编号对应推荐工作流：
+
+| 脚本 | 用途 |
+| --- | --- |
+| `01_convert_urdf_to_mjcf.py` | 模型资产转换 |
+| `02_test_sim.py` | MuJoCo Viewer 仿真检查 |
+| `03_record_data.py` | 手动遥操作录制 |
+| `04_train_smolvla.sh` | 训练命令参考 |
+| `05_eval.py` | 通用推理验证 |
+| `05_eval_table_place.py` | 桌面放置评估 |
+| `06_generate_scripted_data.py` | 关键帧数据生成 |
+| `07_replay_dataset.py` | 数据集回放 |
+| `08_interact.py` | 终端交互推理 |
+| `09_web_interact.py` | 网页控制台 |
+| `10_generate_reach_ik_data.py` | Reach-IK 数据生成 |
 
 ---
 
-## 详细工作流
+## 5. 环境准备
 
-### 1. 环境安装
+### 5.1 基本要求
 
-完整步骤见 [REQUIREMENTS.md](./REQUIREMENTS.md)。最小路径：
+- Linux 或 WSL2
+- Python 3.10
+- uv
+- Git 与 Git LFS
+- FFmpeg
+- 支持训练模型所需版本的 CUDA 与 PyTorch
+- 现代浏览器和 WebGL 2.0
+
+详细系统依赖、JDK、构建工具、镜像配置和已知问题见 [REQUIREMENTS.md](./REQUIREMENTS.md)。
+
+### 5.2 安装项目依赖
 
 ```bash
-# 系统依赖
-sudo apt install -y build-essential git git-lfs ffmpeg openjdk-17-jdk
-
-# uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Python 依赖（三个 extra 必须同时带）
 uv sync --locked --extra aloha --extra smolvla --extra dataset
-
-# Unoarm 自定义包
-uv pip install -e custom_envs/unoarm
-
-# 冒烟测试
-uv run python -c "import gym_unoarm, gymnasium as gym; env = gym.make('gym_unoarm/UnoarmFreeSpace-v0'); obs,_ = env.reset(); print('agent_pos:', obs['agent_pos'].shape); env.close()"
 ```
 
-**国内网络**务必先配 HF 镜像，否则下载 SmolVLA 权重会卡死：
+### 5.3 安装自定义环境
 
 ```bash
-export HF_HUB_DISABLE_XET=1
-export HF_ENDPOINT=https://hf-mirror.com
+export ROBOT_ENV_DIR="$(find custom_envs -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+uv pip install -e "$ROBOT_ENV_DIR"
+```
+
+### 5.4 最小检查
+
+```bash
+uv run python "$ROBOT_ENV_DIR/scripts/02_test_sim.py"
+```
+
+若窗口能打开、机器人模型完整、关节滑块可控制且无资产缺失错误，说明仿真基础链路正常。
+
+---
+
+## 6. 快速使用流程
+
+### 6.1 启动网页控制台
+
+```bash
+uv run python "$ROBOT_ENV_DIR/scripts/09_web_interact.py"
+```
+
+默认地址通常为：
+
+```text
+http://127.0.0.1:7860
+```
+
+首次使用建议：
+
+1. 打开“设置”。
+2. 选择场景。
+3. 配置 checkpoint 和计算设备。
+4. 如需自然语言路由，配置 API 地址、模型和密钥环境变量。
+5. 保存后返回对应功能页。
+6. 先进行仿真或回放验证，再启用远端执行。
+
+### 6.2 跑通数据闭环
+
+```bash
+# 查看数据生成参数
+uv run python "$ROBOT_ENV_DIR/scripts/06_generate_scripted_data.py" --help
+
+# 生成后回放
+uv run python "$ROBOT_ENV_DIR/scripts/07_replay_dataset.py" --help
+
+# 终端交互推理
+uv run python "$ROBOT_ENV_DIR/scripts/08_interact.py"
 ```
 
 ---
 
-### 2. 仿真环境介绍
+## 7. 仿真接口与观测定义
 
-Unoarm 是一个**双臂上肢机器人**的 MuJoCo 仿真，通过 Gymnasium 接口暴露为 `gym_unoarm/UnoarmFreeSpace-v0`。
+### 7.1 动作和状态
 
-**观测 / 动作空间**（16 维，归一化到 [-1, 1]）：
+动作与状态均为 16 维：
 
-| 维度 | 含义         | 维度 | 含义         |
-| ---- | ------------ | ---- | ------------ |
-| 0-6  | 左臂关节 1-7 | 8-14 | 右臂关节 1-7 |
-| 7    | 左夹爪       | 15   | 右夹爪       |
+| 索引 | 内容 |
+| --- | --- |
+| 0–6 | 左臂 7 个关节 |
+| 7 | 左夹爪 |
+| 8–14 | 右臂 7 个关节 |
+| 15 | 右夹爪 |
 
-**相机**（3 个，480×640 RGB）：
+环境内部同时处理 MuJoCo 原始关节值和策略使用的归一化值。动作设计器展示原始弧度值；训练数据和策略接口应遵循环境特征配置，不能把两种单位混用。
 
-- `top`：世界固定俯视相机（外部视角）
-- `left_wrist`：挂载在左臂末端连杆 `Left_Link7` 上的手腕相机（随手运动）
-- `right_wrist`：挂载在右臂末端连杆 `Right_Link7` 上的手腕相机
+### 7.2 图像观测
 
-**关键特性**：
+| 相机 | 位置 | 用途 |
+| --- | --- | --- |
+| `top` | 世界固定 | 全局布局、目标和双臂协同 |
+| `left_wrist` | 左臂末端 | 左侧近距离操作 |
+| `right_wrist` | 右臂末端 | 右侧近距离操作 |
 
-- `UnoarmEnv.step(action)` 是**运动学执行**：直接把 `action` 写入 MuJoCo qpos，调 `mj_forward` 更新场景，不做物理仿真。这样数据收集稳定可复现。
-- 初始位姿 `RAW_ZERO`（全零归一化向量）= 机器人静止姿态。
-- `reward` 和 `success` 在 env 里是**硬编码常量**（`0.0` / `False`），因为这是 free-space 行为克隆任务，没有任务成功判定。**eval 的 success rate 数字没有参考价值**，模型好坏要看推理可视化（第 7 节）。
+三路均为 RGB 图像，默认分辨率 480×640。策略预训练时的相机键可能不同，训练命令必须提供一致的重命名映射。
 
-**试用 env**：
+### 7.3 成功判定
 
-```bash
-# 开 MuJoCo viewer 拖滑块手动控制
-uv run python custom_envs/unoarm/scripts/02_test_sim.py
-```
+- 自由空间任务偏向动作模仿，基础 reward/success 可能不反映动作质量。
+- 双目标场景使用 TCP 到目标点的距离阈值。
+- 桌面放置场景根据抓取、搬运、释放和目标区域关系计算阶段结果。
 
----
-
-### 3. 数据采集（手动 teleop，可选）
-
-如果想用真实遥操数据（而非脚本生成），可以用键盘 teleop 录制：
-
-```bash
-uv run python custom_envs/unoarm/scripts/03_record_data.py
-```
-
-> 本项目**默认用脚本化生成**（第 4 节），更稳定、可复现、易扩展。teleop 仅作为备选。
+因此不能用同一成功率解释所有场景。自由空间任务应结合视频和轨迹检查；物体操作任务可使用阶段指标和最终成功率。
 
 ---
 
-### 4. 脚本化数据生成（推荐）
+## 8. 数据生成工作流
 
-这是本项目的主力数据生成方式。核心思路：**在 JSON 文件里定义关键位姿（key pose），脚本自动在相邻 key pose 间线性插值 + 加噪声，生成大量轨迹**。
+### 8.1 关键帧数据
 
-#### 4.1 JSON 格式
-
-key pose 定义在 `custom_envs/unoarm/data/poses_*.json`，格式：
+关键帧 JSON 由语言任务和姿态列表组成：
 
 ```json
 {
-  "task": "语言指令（会写入数据集的 task 字段，模型用它做语言条件）",
+  "task": "Raise both arms",
   "poses": [
     {
-      "Left_Joint1": 1.0,
-      "Left_Joint2": 0.41,
-      "Left_Joint3": 0.51,
-      "Left_Joint4": 1.0,
-      "Left_Joint5": -0.08,
-      "Left_Joint6": 1.0,
-      "Left_Joint7": 0.01,
-      "Left_Gripper_Joint": -0.55,
-      "Right_Joint1": 0.48,
-      "Right_Joint2": -0.44,
-      "Right_Joint3": -0.39,
-      "Right_Joint4": 1.0,
-      "Right_Joint5": -0.17,
-      "Right_Joint6": 0.91,
-      "Right_Joint7": 0.03,
-      "Right_Gripper_Joint": -0.75
+      "Left_Joint1": 0.25,
+      "Right_Joint1": -0.25
     },
-    { "...": "更多 key pose..." }
+    {
+      "Left_Joint1": 0.60,
+      "Right_Joint1": -0.60
+    }
   ]
 }
 ```
 
-**规则**：
+未提供的关节使用默认值。生成器在相邻姿态之间插值，并可添加 episode 级姿态扰动、路径中点扰动和保持段扰动。
 
-- `task`：字符串，是 VLA 模型的语言输入（如 `"Prepare to fight and taunt."`）
-- `poses`：按顺序列出机器人要经过的关键位姿，脚本会在相邻 pose 间插值
-- 每个 pose 用**关节名映射**（不是数组），16 个关节，名字必须匹配 `CONTROL_JOINTS`：
-  - 缺失的关节默认 0.0
-  - 写了不存在的关节名会报错
-- **脚本自动在序列前后补 `RAW_ZERO`（静止位姿）**，你不用写起止静止
-- 想让动作循环，就在 `poses` 里把循环的 pose 多写几遍（如 `[A, B, A, B, A]`）
+推荐原则：
 
-#### 4.2 获取 key pose 数值
+- 优先使用 episode 级小扰动，提高数据多样性且保持轨迹平滑。
+- 谨慎使用逐帧噪声，过大会让回放和策略输出抖动。
+- 关键帧数量以表达运动阶段为准，不要堆积大量近似姿态。
+- 生成后必须回放抽查多个 episode。
 
-在 MuJoCo viewer 里把滑块拖到目标位置，读出各关节值：
+### 8.2 动作设计器
+
+网页动作设计流程：
+
+1. 使用关节滑块调整当前姿态。
+2. 保存为命名关键帧。
+3. 将关键帧添加到播放列表，可重复引用。
+4. 调整顺序并预览插值轨迹。
+5. 填写英文任务指令和工程名。
+6. 保存工程文件和扁平姿态文件。
+7. 从网页或命令行生成数据。
+
+工程文件保留关键帧库和播放列表，适合继续编辑；扁平姿态文件直接供生成脚本使用。
+
+### 8.3 Reach-IK 数据
+
+Reach-IK 支持：
+
+- 从 JSON 读取目标点
+- 在三维包围盒内随机采样目标
+- 为每个目标生成一个或多个 episode
+- 固定或配置 TCP 姿态
+- 设置接近、抓取和执行点阶段
+- 保存目标参数与 IK 元数据
+
+命令入口：
 
 ```bash
-uv run python custom_envs/unoarm/scripts/02_test_sim.py
-# 在 viewer 的 Sliders 面板里拖动关节到目标位姿，记录 Control 值
+uv run python "$ROBOT_ENV_DIR/scripts/10_generate_reach_ik_data.py" --help
 ```
 
-> ⚠️ 关节值是 **MuJoCo 原始弧度值**（不是归一化值），范围见 `gym_unoarm/constants.py` 的 joint range。脚本会自动 clip 到合法范围，超出会打印警告。
+### 8.4 桌面抓取放置数据
 
-#### 4.3 生成命令
+桌面任务生成器负责：
 
-```bash
-uv run python custom_envs/unoarm/scripts/06_generate_scripted_data.py \
-  --poses-json custom_envs/unoarm/data/poses_prepare_fight_taunt.json \
-  --episodes 30 \
-  --segment-steps 20 \
-  --hold-steps 5 \
-  --midpoint-noise-std 0.02 \
-  --hold-noise-std 0.01 \
-  --pose-jitter-std 0.05 \
-  --seed 0 \
-  --output-root custom_envs/unoarm/data/unoarm_prepare_fight_taunt \
-  --repo-id doki/unoarm_prepare_fight_taunt \
-  --overwrite
-```
+1. 采样满足边界和净空约束的物体位置。
+2. 计算 TCP 偏移与抓取前预备点。
+3. 求解接近、下降、闭合、抬升、搬运、下降和释放关键位姿。
+4. 插值并写入 episode。
+5. 保存场景参数，供回放和评估复现。
 
-**参数说明**：
+### 8.5 数据质量检查
 
-| 参数                   | 默认                                  | 说明                                                               |
-| ---------------------- | ------------------------------------- | ------------------------------------------------------------------ |
-| `--poses-json`         | `data/poses_prepare_fight_taunt.json` | key pose 定义文件                                                  |
-| `--episodes`           | 30                                    | 生成的 episode 数                                                  |
-| `--segment-steps`      | 20                                    | 两个相邻 key pose 间插值多少帧                                     |
-| `--hold-steps`         | 5                                     | 每个 key pose 保持多少帧                                           |
-| `--midpoint-noise-std` | 0.0                                   | 插值中点加噪声（端点为 0，保持轨迹平滑），增加数据多样性           |
-| `--hold-noise-std`     | 0.0                                   | hold 段加微抖动，避免完全静止产生重复帧                            |
-| `--pose-jitter-std`    | 0.0                                   | 每个 episode 对 key pose 加固定偏移，让 30 个 episode 风格各有不同 |
-| `--seed`               | 0                                     | 基础种子；每个 episode 用 `seed + episode_index`                   |
-| `--overwrite`          | -                                     | 输出目录已存在时先删除                                             |
+至少检查：
 
-**为什么需要噪声参数**：如果 `midpoint-noise-std`、`hold-noise-std`、`pose-jitter-std` 全是 0，30 个 episode 会生成**完全相同**的轨迹（因为 key pose 是硬编码的）。推荐值（`0.02 / 0.01 / 0.05`）能让轨迹保持主旋律的同时各有差异，提升模型泛化能力。
-
-**生成产物**：标准 LeRobotDataset v3.0 格式（Parquet + 内嵌 PNG 图像），约 7650 帧 / 30 episodes。
+- 图像是否正常，腕部相机是否随末端运动
+- state/action 维度和单位是否一致
+- 语言任务是否正确写入
+- 轨迹是否越过关节限制
+- 抓取时夹爪开闭时序是否正确
+- 回放状态误差是否接近零
+- 多个 episode 是否有合理多样性
+- 目标采样是否覆盖预期工作空间
 
 ---
 
-### 5. 数据回放检验
+## 9. 策略训练
 
-生成数据后，用 MuJoCo viewer 回放，确认机器人动作符合预期：
+### 9.1 训练前检查
+
+1. 确认数据集能回放。
+2. 统计 episode 数和帧数。
+3. 检查三路相机键。
+4. 检查 16 维 state/action。
+5. 检查任务文本和场景一致。
+6. 明确从预训练权重微调还是从头训练。
+7. 为输出目录保留足够磁盘空间。
+
+### 9.2 相机映射
+
+某些预训练 VLA 模型要求固定的图像特征名，而项目数据使用语义相机名。训练时需将顶视、左腕和右腕映射到模型期望的三个输入槽位。映射只改变特征键，不改变图像内容。
+
+### 9.3 关键训练参数
+
+| 参数类别 | 关注点 |
+| --- | --- |
+| 模型 | 预训练路径、动作块长度、视觉语言骨干 |
+| 数据 | 本地根目录、仓库标识、相机映射 |
+| 优化 | batch size、学习率、训练步数 |
+| 保存 | 输出目录、保存频率、保留策略 |
+| 评估 | 场景、episode 数、同步/异步环境 |
+| 设备 | CUDA、精度、显存与离线缓存 |
+
+训练命令随 LeRobot 版本和策略不同而变化，优先以脚本帮助和当前配置类为准：
 
 ```bash
-# 回放 episode 0，1 倍速，循环
-uv run python custom_envs/unoarm/scripts/07_replay_dataset.py \
-  --root custom_envs/unoarm/data/unoarm_prepare_fight_taunt \
-  --episode 0 --speed 1.0 --loop
+uv run python "$ROBOT_ENV_DIR/scripts/04_train_smolvla.sh" --help
 ```
 
-**参数**：
+如该文件是固定 shell 示例，请先阅读并复制命令到终端，根据当前数据和输出目录修改，不要直接覆盖已有训练结果。
 
-- `--episode N`：回放第 N 个 episode
-- `--speed 1.0`：播放倍速（`0` = 最快）
-- `--loop`：循环播放直到关 viewer
-- `--state-units raw|normalized|both`：终端打印的关节单位
+### 9.4 Checkpoint 选择
 
-脚本会用数据集里的 `action` 驱动 env，同时终端实时打印当前关节状态和与录制 state 的最大误差（`max_state_error`，应接近 0，证明 env 确定性可复现）。
+建议同时关注：
 
-> 这是验证数据质量的关键一步——**回放看到的动作就是你训练要教模型学的动作**。
+- 训练损失趋势
+- 不同步数 checkpoint 的回放表现
+- 动作是否平滑
+- 是否能完成关键阶段
+- 新目标或轻微扰动下的泛化
+- 多次 episode 的稳定性
+
+最终 checkpoint 不一定是最优 checkpoint，应结合验证视频和任务指标选择。
 
 ---
 
-### 6. 开始 SmolVLA 训练
+## 10. 推理与评估
 
-#### 6.1 训练命令
+### 10.1 终端推理
 
 ```bash
-DEVICE=cuda uv run unoarm-train \
-  --policy.path=lerobot/smolvla_base \
-  --rename_map='{"observation.images.top":"observation.images.camera1","observation.images.left_wrist":"observation.images.camera2","observation.images.right_wrist":"observation.images.camera3"}' \
-  --env.type=unoarm \
-  --env.task=UnoarmFreeSpace-v0 \
-  --dataset.repo_id=doki/unoarm_prepare_fight_taunt \
-  --dataset.root=custom_envs/unoarm/data/unoarm_prepare_fight_taunt \
-  --batch_size=4 \
-  --steps=20000 \
-  --log_freq=200 \
-  --save_freq=2000 \
-  --eval_steps=0 \
-  --eval.use_async_envs=false \
-  --eval.batch_size=1 \
-  --policy.push_to_hub=false \
-  --output_dir=data/outputs/smolvla_unoarm
+uv run python "$ROBOT_ENV_DIR/scripts/08_interact.py"
 ```
 
-**关键参数说明**：
+流程为：
 
-| 参数                                 | 值            | 说明                                             |
-| ------------------------------------ | ------------- | ------------------------------------------------ |
-| `DEVICE=cuda`                        | 环境变量      | 强制 GPU（SmolVLA 必须用 CUDA）                  |
-| `--policy.path=lerobot/smolvla_base` | HF 预训练权重 | **微调模式**，首次下载约 900MB                   |
-| `--rename_map`                       | 相机映射      | **必填**，见下方说明                             |
-| `--batch_size=4`                     | 小 batch      | 显存大可改 8，OOM 改 2                           |
-| `--steps=20000`                      | 训练步数      | 7650 帧 / batch 4 ≈ 10 epoch                     |
-| `--eval_steps=0`                     | 不跑 eval     | env 的 reward/success 是常量，eval 无意义        |
-| `--eval.use_async_envs=false`        | 单进程        | 避免 NamespaceNotFound（见 REQUIREMENTS.md 3.7） |
+1. 加载 checkpoint 和预处理器。
+2. 重置仿真场景。
+3. 接收语言指令。
+4. 采集三路图像与状态。
+5. 预测动作块。
+6. 逐步执行并刷新 Viewer。
+7. 达到最大步数或成功条件后结束。
 
-#### 6.2 `--rename_map` 为什么必填
+### 10.2 网页推理
 
-`smolvla_base` 预训练时用的相机 key 是 `camera1/2/3`（论文里的 OBS_IMAGE_1/2/3），本数据集用的是 `top/left_wrist/right_wrist`。policy 严格校验 key 一致性，不匹配会立刻报错退出。
+网页中 LLM 先判断输入属于闲聊还是动作任务。动作请求还需通过允许任务列表，然后由策略 Runner 执行。生成任务和 rollout 使用互斥状态，防止多个流程同时修改仿真。
 
-按 SmolVLA 论文约定映射：
+### 10.3 桌面任务评估
 
-- `camera1` = top（俯视）
-- `camera2` = wrist（手腕）
-- `camera3` = side（侧视）
-
-本数据集把 `left_wrist → camera2`、`right_wrist → camera3`（双臂占满 wrist/side 槽位）。
-
-> ⚠️ JSON 必须用**单引号包裹、内部双引号**，直接复制上面的命令即可。详细见 [REQUIREMENTS.md 3.9](./REQUIREMENTS.md#39-smolvla-相机名不匹配)。
-
-#### 6.3 训练输出
-
-```
-data/outputs/smolvla_unoarm/
-└─ checkpoints/
-   ├─ 002000/pretrained_model/   # 每 2000 步存一次
-   ├─ 004000/pretrained_model/
-   ├─ ...
-   ├─ 020000/pretrained_model/
-   └─ last/pretrained_model/     # 最后一个的别名（推荐用这个）
+```bash
+uv run python "$ROBOT_ENV_DIR/scripts/05_eval_table_place.py" --help
 ```
 
-每个 `pretrained_model/` 含：`config.json`、`model.safetensors`、`policy_preprocessor.json`、`policy_postprocessor.json`。
+评估可随机采样场景，也可读取生成元数据复现训练目标。建议同时保存：
 
-#### 6.4 关于 eval success rate = 0%
+- 每个 episode 的初始条件
+- 阶段完成情况
+- 最终成功与失败原因
+- 动作和状态轨迹
+- 相机视频
+- 总体成功率
 
-训练结束 LeRobot 会自动跑一次 eval（`env_eval_freq` 默认 = `steps`）。因为 `UnoarmEnv` 的 `reward` / `success` 是硬编码常量（`0.0` / `False`），**eval 报 `pc_success=0.0%` 是必然的，与模型好坏无关**。真正判断模型效果用第 7 节的交互式推理。
+### 10.4 动作安全处理
+
+Runner 支持：
+
+- 动作分块
+- 指数移动平均
+- 单步最大动作变化限制
+- 最大执行步数
+- 达标提前终止
+- 执行速度控制
+
+这些参数能抑制模型输出尖峰，但不能替代真实机器人的限位、碰撞检测、急停和人工监护。
 
 ---
 
-### 7. 训练后可视化验证
+## 11. Web 控制台架构
 
-训练完成后，用交互式推理脚本看模型实际表现：
+### 11.1 后端组件
 
-```bash
-uv run python custom_envs/unoarm/scripts/08_interact.py
-```
+| 组件 | 作用 |
+| --- | --- |
+| 应用入口 | 静态资源、REST API、模型资源和 WebSocket |
+| Runner | 环境、策略、生成任务、回放和状态快照 |
+| 模式控制器 | 管理对话、设计和生成状态互斥 |
+| 设置存储 | JSON 持久化、类型归一化、API 密钥遮罩 |
+| LLM 路由 | 闲聊/任务判断和任务白名单 |
+| 桥接客户端 | 向可选远端执行服务发送动作 |
 
-**使用流程**：
+### 11.2 前端组件
 
-1. 脚本加载 checkpoint（默认 `data/outputs/smolvla_unoarm/checkpoints/last/pretrained_model`）
-2. 打开 MuJoCo viewer 显示机器人
-3. 终端提示输入语言指令：
+| 页面/模块 | 作用 |
+| --- | --- |
+| 三维场景 | URDF、网格、灯光、道具和目标标记 |
+| 对话页 | 消息、任务触发和 rollout 日志 |
+| 动作设计页 | 关节编辑、关键帧、播放列表和导出 |
+| 目标位姿页 | 修改任务道具位置和姿态 |
+| Reach-IK 页 | 参数配置、生成、数据集列表和回放 |
+| 验证页 | checkpoint 与任务评估 |
+| 设置页 | 模型、设备、LLM、场景和桥接参数 |
 
-   ```
-   === Unoarm SmolVLA interactive inference ===
-   Type a language instruction and press Enter to run an episode.
-   Type 'quit' / 'exit' (or close the viewer) to leave.
+### 11.3 实时通信
 
-   指令>
-   ```
+WebSocket 周期性发送：
 
-4. 输入训练时用过的指令（如 `Prepare to fight and taunt.`），机器人会从静止位姿开始按模型输出的动作运动 255 步
-5. 一个 episode 结束后回到提示符，可输入下一条指令测试泛化
-6. 输入 `quit` / `exit` / 空回车，或关闭 viewer 退出
+- 当前模式和任务状态
+- 关节状态
+- 场景配置
+- 目标距离和成功信息
+- 数据生成进度
+- 相机 JPEG 帧
+- 系统日志和错误
 
-**常用参数**：
-
-| 参数           | 默认                                                            | 说明                                       |
-| -------------- | --------------------------------------------------------------- | ------------------------------------------ |
-| `--checkpoint` | `data/outputs/smolvla_unoarm/checkpoints/last/pretrained_model` | 指定不同步数的 checkpoint 对比             |
-| `--task "..."` | 无                                                              | 单次模式：跑一条指令后退出（不进交互循环） |
-| `--max-steps`  | 255                                                             | 每个 episode 步数                          |
-| `--speed`      | 1.0                                                             | 播放倍速                                   |
-
-**单次模式示例**：
-
-```bash
-uv run python custom_envs/unoarm/scripts/08_interact.py \
-  --task "Prepare to fight and taunt." \
-  --checkpoint data/outputs/smolvla_unoarm/checkpoints/020000/pretrained_model
-```
-
-> 脚本已内置 `HF_HUB_OFFLINE=1`（避免加载 VLM processor 时联网失败，见 [REQUIREMENTS.md 3.10](./REQUIREMENTS.md#310-smolvla-加载-vlm-processor-联网失败)）。
+浏览器以快照驱动三维模型和状态栏，不直接控制后端线程。
 
 ---
 
-## Web 控制台与扩展场景
+## 12. 配置与安全
 
-### Web 控制台
+### 12.1 设置持久化
 
-```bash
-uv run python custom_envs/unoarm/scripts/09_web_interact.py
-```
+网页设置保存在自定义环境的本地数据目录。主要配置包括：
 
-默认监听 `0.0.0.0:7860` 并尝试打开支持 WebGL 的 Chrome；服务器启动后也可手动访问 `http://127.0.0.1:7860`。页面提供：
+- checkpoint
+- VLM 名称或本地路径
+- device
+- LLM 模型、API 地址和超时
+- API 密钥环境变量名
+- 允许任务列表
+- 场景和目标位姿
+- rollout、平滑、限幅和显示参数
+- 远端桥接地址和超时
 
-- **对话控制**：OpenAI-compatible LLM 将自然语言区分为闲聊或机器人动作请求，再触发已加载策略执行。
-- **动作设计**：用 16 个关节滑块设计关键帧、编排播放列表、预览动作，并导出 `.design.json` 与 `.poses.json`。
-- **数据生成与回放**：在后台生成关键帧或 IK 数据集，并在浏览器 3D 场景中检查轨迹。
-- **运行设置**：配置 checkpoint、设备、LLM API、场景及 rollout 参数，持久化到 `custom_envs/unoarm/data/web_settings.json`。
+### 12.2 密钥管理
 
-未加载策略时，动作设计和数据生成仍可使用。Web 端的对话、设计和生成任务采用互斥状态，避免 rollout 与数据生成同时修改仿真状态。更多操作说明见 [`custom_envs/unoarm/README.md`](./custom_envs/unoarm/README.md)。
+- 优先通过环境变量传入 API 密钥。
+- 不要把真实密钥写进 README、测试、提交记录或共享设置文件。
+- 后端返回设置时应保持密钥遮罩。
+- 发布日志前检查请求头、异常栈和命令历史。
 
-### Reach-IK 抓剑数据
+### 12.3 真实机器人注意事项
 
-Reach-IK 使用 MuJoCo DLS 逆运动学，根据剑柄目标点自动生成右臂“接近 → 抓取”轨迹，不需要手工设计关节关键帧。目标点可以来自 JSON，也可以从工作空间 AABB 随机采样：
+远端执行属于高风险能力。启用前应确认：
 
-```bash
-uv run python custom_envs/unoarm/scripts/10_generate_reach_ik_data.py \
-  --bbox-min -0.45 -0.65 0.95 \
-  --bbox-max -0.20 -0.40 1.15 \
-  --num-targets 40 --episodes-per-target 1 \
-  --output-root custom_envs/unoarm/data/unoarm_reach_ik \
-  --overwrite
-```
-
-对应 Gym 环境为 `gym_unoarm/UnoarmReachSword-v0`。生成器会记录目标与 IK 元数据，`07_replay_dataset.py` 和 Web 控制台可据此自动恢复场景并回放。
-
-### 桌面抓取放置
-
-`table_place` 场景包含桌面、圆柱和目标圆，支持随机化圆柱起点、IK 生成抓取放置数据、数据集回放和 ACT checkpoint 评估。当前推荐从 Web 控制台进入 **Reach-IK** 页面，将生成模式切换为 `table_place`；生成逻辑位于 `data_gen/table_place_ik.py`。
-
-训练后可用专用脚本评估：
-
-```bash
-uv run python custom_envs/unoarm/scripts/05_eval_table_place.py \
-  --checkpoint /path/to/pretrained_model \
-  --no-from-meta
-```
-
-`--no-from-meta` 会在工作空间内随机采样圆柱位置；如需复用训练集目标点，可改为 `--from-meta /path/to/table_place_ik_meta.json`。评估结果会保存视频、指标和逐 episode 信息，便于检查抓取、搬运与放置阶段的实际表现。
+- 网络目标地址准确
+- 动作单位和关节顺序一致
+- 软件与硬件限位生效
+- 初始姿态一致
+- 工作区无人且无障碍物
+- 急停可用
+- 先用仅验证、不执行模式检查请求
+- 小速度、小范围、单臂开始测试
 
 ---
 
-## 目录结构
+## 13. 测试与验证
 
-```
-uno-llm-lerobot-ACT/
-├─ README.md                      # 本文档
-├─ VLA各系列综述.pdf             # VLA 模型系列与技术背景综述
-├─ REQUIREMENTS.md                # 环境安装 + 踩坑记录
-├─ AGENTS.md / AGENT_GUIDE.md     # LeRobot 原生 AI agent 指引（保留）
-├─ pyproject.toml                 # 依赖定义（含 aloha/smolvla/dataset extras）
-├─ uv.lock                        # 锁定的依赖版本
-├─ src/lerobot/                   # LeRobot 源码（不改一行）
-├─ tests/                         # LeRobot 测试套件
-├─ docs/                          # LeRobot 文档
-│
-├─ custom_envs/unoarm/            # ★ 本项目核心
-│  ├─ gym_unoarm/                 # MuJoCo + Gymnasium 仿真
-│  │  ├─ env.py                   #   UnoarmEnv（16D 双臂 action/state）
-│  │  ├─ constants.py             #   关节定义、相机、控制频率
-│  │  ├─ ik.py                    #   MuJoCo DLS 逆运动学
-│  │  ├─ reach_scene.py           #   抓剑场景
-│  │  ├─ table_place_scene.py     #   桌面抓取放置场景
-│  │  ├─ mujoco_unoarm*.xml       #   MJCF 模型与场景
-│  │  ├─ unoarm_mujoco.urdf       #   URDF 源文件
-│  │  └─ meshes/*.stl             #   机器人与道具网格资产
-│  ├─ lerobot_unoarm/             # LeRobot env 注册
-│  │  ├─ config.py                #   @register_subclass("unoarm")
-│  │  └─ wrapper.py               #   unoarm-train / unoarm-eval 入口
-│  ├─ data_gen/                   # 关键帧、Reach-IK、Table-Place 数据生成
-│  ├─ pose_design/                # 关键帧工程、预览与 poses 导出
-│  ├─ webapp/                     # FastAPI、LLM 路由、模式与仿真 Runner
-│  ├─ static/web/                 # 浏览器 3D 控制台
-│  ├─ scripts/
-│  │  ├─ 01_convert_urdf_to_mjcf.py   # URDF → MJCF 转换
-│  │  ├─ 02_test_sim.py               # MuJoCo viewer 手动测试
-│  │  ├─ 03_record_data.py            # 键盘 teleop 数据采集（可选）
-│  │  ├─ 04_train_smolvla.sh          # 训练命令示例（旧版，参考用）
-│  │  ├─ 05_eval.py                   # 通用推理 smoke test
-│  │  ├─ 05_eval_table_place.py       # 桌面放置策略评估
-│  │  ├─ 06_generate_scripted_data.py # ★ 脚本化数据生成（主入口）
-│  │  ├─ 07_replay_dataset.py         # ★ 数据回放可视化
-│  │  ├─ 08_interact.py               # 终端交互式推理
-│  │  ├─ 09_web_interact.py           # ★ Web 控制台
-│  │  └─ 10_generate_reach_ik_data.py # ★ Reach-IK 数据生成
-│  ├─ data/
-│  │  ├─ poses_prepare_fight_taunt.json  # key pose 定义（入 git）
-│  │  ├─ web_settings.json               # Web 设置
-│  │  ├─ designs/                        # Web 动作设计工程
-│  │  └─ unoarm_*/                       # 生成的数据集（不入 git）
-│  ├─ tests/                         # Unoarm 环境、IK、Web 与数据测试
-│  └─ pyproject.toml              # unoarm 包定义（unoarm-train 入口）
-│
-├─ data/outputs/                  # 训练 checkpoint（不入 git，每个 ~1G）
-└─ outputs/                       # LeRobot 默认输出（不入 git）
+### 13.1 测试范围
+
+自定义环境测试覆盖：
+
+- 环境创建和场景配置
+- DLS IK
+- 双目标 Reach 场景
+- 桌面放置场景
+- 关键帧数据生成
+- Reach-IK 和桌面 IK 数据生成
+- 动作设计模型与存储
+- Web 模式互斥
+- 设置持久化
+- 远端桥接客户端
+
+### 13.2 运行测试
+
+```bash
+uv run pytest "$ROBOT_ENV_DIR/tests" -v
 ```
 
-**入 git 的**：所有 `.py` / `.md` / `.toml` / `.json` 配置 + `gym_unoarm/` 下的模型资产（`meshes/*.stl`、`mujoco_unoarm.xml`、`unoarm_mujoco.urdf`）。
-**不入 git 的**：数据集（`custom_envs/unoarm/data/unoarm_*/`）、训练 checkpoint（`data/outputs/`）、`.venv`、HF cache。详见 `.gitignore`。
+只运行某一类：
+
+```bash
+uv run pytest "$ROBOT_ENV_DIR/tests/test_ik.py" -v
+uv run pytest "$ROBOT_ENV_DIR/tests/test_pose_design.py" -v
+uv run pytest "$ROBOT_ENV_DIR/tests/test_webapp_modes.py" -v
+```
+
+### 13.3 提交前检查
+
+```bash
+git status --short
+git diff --check
+uv run pytest "$ROBOT_ENV_DIR/tests" -q
+```
+
+涉及前端时还应实际打开页面，检查浏览器控制台、WebSocket、模型加载、相机预览和日夜主题。
 
 ---
 
-## 常见问题
+## 14. 常见问题
 
-<details>
-<summary><b>装环境踩坑（bazel / JDK / HF 卡死 / extras 缺失 等）</b></summary>
+### 页面没有三维模型
 
-见 [REQUIREMENTS.md 第 3 节"踩坑记录"](./REQUIREMENTS.md#3-踩坑记录)，包含 10 个实际踩到的坑和完整解决方案。
+- 确认浏览器支持 WebGL。
+- 检查模型资源请求是否为 200。
+- 查看浏览器控制台中的 URDF 或网格加载错误。
+- 避免使用禁用 GPU 的内嵌预览器。
 
-</details>
+### 数据回放与录制不一致
 
-<details>
-<summary><b>训练时报相机 Feature mismatch</b></summary>
+- 检查 raw 与 normalized 单位是否混用。
+- 检查关节顺序是否仍为 16 维固定顺序。
+- 确认数据和回放使用同一场景。
+- 检查元数据中的目标位姿是否被加载。
 
-`smolvla_base` 期望 `camera1/2/3`，你的数据是 `top/left_wrist/right_wrist`。训练命令必须带 `--rename_map`，见 [第 6.2 节](#62---rename_map-为什么必填)。
+### 训练时报图像特征不匹配
 
-</details>
+预训练模型期望的相机键与数据集键不同。为三路图像配置显式重命名映射，并确认训练和推理使用同一映射。
 
-<details>
-<summary><b>eval 的 success rate 一直是 0%</b></summary>
+### 多个 episode 完全相同
 
-正常现象。`UnoarmEnv` 的 reward/success 是硬编码常量，eval 数字无意义。模型好坏看 [第 7 节](#7-训练后可视化验证) 的交互推理。
+关键帧生成时未启用 episode 级扰动。增加小幅姿态扰动，并通过回放确认轨迹仍平滑且不越界。
 
-</details>
+### 推理动作抖动
 
-<details>
-<summary><b>生成的 30 个 episode 完全相同</b></summary>
+- 检查训练数据本身是否含逐帧噪声。
+- 降低动作更新速度。
+- 启用适量 EMA。
+- 设置单步动作变化限制。
+- 检查动作块衔接和模型预后处理配置。
 
-噪声参数全是 0 导致的。加 `--midpoint-noise-std 0.02 --hold-noise-std 0.01 --pose-jitter-std 0.05`，见 [第 4.3 节](#43-生成命令)。
+### 成功率一直为零
 
-</details>
+先确认所用场景是否实现有效成功判定。自由空间动作模仿不能只看 success，应结合轨迹、关键姿态和视频；物体操作场景再使用阶段指标和最终成功率。
 
-<details>
-<summary><b>推理时报 OSError: Can't load processor for SmolVLM2</b></summary>
+### 模型或处理器无法加载
 
-VLM backbone 加载需要联网，但你的网络访问 HF 不通。`08_interact.py` 已内置 `HF_HUB_OFFLINE=1`；如果训练时遇到，前置该环境变量。见 [REQUIREMENTS.md 3.10](./REQUIREMENTS.md#310-smolvla-加载-vlm-processor-联网失败)。
+- 检查 checkpoint 是否包含模型、配置、预处理和后处理文件。
+- 检查 Hugging Face 缓存或镜像配置。
+- 离线运行前确保所有依赖权重已经下载。
+- 核对当前代码版本与 checkpoint 配置兼容性。
 
-</details>
+---
 
-<details>
-<summary><b>想训练新动作（不是 prepare to fight）</b></summary>
+## 15. 扩展指南
 
-1. 复制 `custom_envs/unoarm/data/poses_prepare_fight_taunt.json` 改名
-2. 改 `task` 字段为新指令，改 `poses` 为新动作的 key pose
-3. 用新的 `--poses-json` 和 `--output-root` 跑生成命令
-4. 用新的 `--dataset.repo_id` / `--dataset.root` 跑训练
-</details>
+### 新增动作任务
+
+1. 在动作设计器中创建关键帧。
+2. 绑定清晰且稳定的语言任务。
+3. 生成带适量多样性的多个 episode。
+4. 回放并修正动作。
+5. 合并或单独训练数据集。
+6. 在已见目标和未见轻微变化上验证。
+
+### 新增任务场景
+
+1. 在 MJCF 中加入道具、site 和相机。
+2. 在场景构建模块中实现资产生成或注入。
+3. 在环境中增加 reset 参数和任务状态。
+4. 定义成功条件、终止条件和指标。
+5. 为网页快照增加场景配置。
+6. 在 Three.js 中增加对应道具和标记。
+7. 编写环境、生成器和回放测试。
+
+### 新增策略
+
+1. 定义策略需要的观测特征。
+2. 配置相机键映射。
+3. 确认状态和动作维度。
+4. 接入预处理器与后处理器。
+5. 在 Runner 中实现加载和动作获取。
+6. 用固定数据和固定场景做回归验证。
+
+### 接入真实机器人
+
+建议保持策略层与硬件层解耦，通过桥接服务完成：
+
+```text
+策略动作 → 安全过滤 → 协议转换 → 硬件控制器 → 执行结果
+```
+
+桥接服务应负责鉴权、超时、限位、序列号、幂等性和急停状态；网页端只负责发起经过验证的任务。
+
+---
+
+## 16. 数据与版本管理
+
+建议纳入版本控制：
+
+- 源代码
+- 小型配置
+- 任务定义和关键帧
+- 测试
+- 文档
+- 必需的小型模型资产
+
+建议排除：
+
+- 生成数据集
+- checkpoint
+- 视频和评估大文件
+- 虚拟环境
+- 模型缓存
+- API 密钥
+- 本机路径设置
+
+每次训练记录代码提交、数据版本、随机种子、模型配置、相机映射和输出目录，保证结果可追溯。
+
+---
+
+## 17. 推荐阅读顺序
+
+1. 本 README：理解整体架构和工作流。
+2. [环境安装说明](./REQUIREMENTS.md)：完成依赖安装并处理平台差异。
+3. [VLA 技术综述](./VLA各系列综述.pdf)：了解模型路线与技术背景。
+4. 自定义环境的 README：查看网页、动作设计和数据工具细节。
+5. `scripts/`：按编号理解实际执行链路。
+6. `tests/`：以可执行断言理解边界条件。

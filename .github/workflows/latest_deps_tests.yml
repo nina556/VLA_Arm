@@ -18,14 +18,8 @@
 name: Latest Dependency Tests
 
 on:
-  # Allows running this workflow manually from the Actions tab
+  # All workflows are opt-in for this standalone repository.
   workflow_dispatch:
-
-  # Runs at 03:00 UTC
-  schedule:
-    - cron: "0 3 * * *"
-
-# Sets up the environment variables
 env:
   UV_VERSION: "0.8.0"
   PYTHON_VERSION: "3.12"

@@ -1,222 +1,349 @@
-# Unoarm LeRobot environment
+# 双臂机器人自定义环境
 
-This package adds a MuJoCo/Gymnasium Unoarm simulation without changing the
-LeRobot source tree.
+本目录是项目的机器人业务核心，包含 MuJoCo/Gymnasium 环境、LeRobot 注册、数据生成、动作设计、Web 服务、三维前端和测试。本文侧重具体开发与使用；总体技术背景、训练方法和系统架构见仓库根目录 README。
 
-## Layout
+> 文档约定：以下命令均在本目录执行，因此不需要写出本目录的实际名称。
 
-- `gym_unoarm`: Gymnasium environment registered as
-  `gym_unoarm/UnoarmFreeSpace-v0`.
-- `lerobot_unoarm`: LeRobot `EnvConfig` registration for `--env.type=unoarm`.
-- `scripts/01_convert_urdf_to_mjcf.py`: copies the Unoarm assets and writes
-  `gym_unoarm/mujoco_unoarm.xml`.
-- `scripts/02_test_sim.py`: interactive MuJoCo smoke test.
-- `scripts/03_record_data.py`: keyboard teleoperation recorder for LeRobotDataset.
-- `scripts/04_train_smolvla.sh`: SmolVLA finetune from `lerobot/smolvla_base`
-  (features are forced from the dataset: 16-D state/action).
-- `scripts/05_eval.py`: SmolVLA inference smoke test.
-- `scripts/06_generate_scripted_data.py`: CLI for scripted dataset generation (core logic in `data_gen/`).
-- `scripts/10_generate_reach_ik_data.py`: multi-target reach-IK grasp + execution-point datasets.
-- `scripts/08_interact.py`: terminal chat + SmolVLA interact.
-- `scripts/09_web_interact.py`: web console (chat + pose design).
-- `webapp/`, `pose_design/`, `static/web/`: modular web backend/frontend.
-- `data/designs/`: saved `*.design.json` projects and exported `*.poses.json`.
+---
 
-## Setup
-
-From the LeRobot repository root:
-
-```bash
-uv pip install -e custom_envs/unoarm
-uv run python custom_envs/unoarm/scripts/01_convert_urdf_to_mjcf.py
-```
-
-The converter reads assets from `/mnt/d/work/code/unoarm_model` by default. To
-use another source:
-
-```bash
-UNOARM_MODEL_DIR=/path/to/unoarm_model \
-  uv run python custom_envs/unoarm/scripts/01_convert_urdf_to_mjcf.py
-```
-
-## Web console (chat + pose design)
-
-从仓库根目录启动（路径请用 Linux 正斜杠）。**默认无参即可**：
-
-```bash
-uv run python custom_envs/unoarm/scripts/09_web_interact.py
-```
-
-启动后会自动用 **Windows Chrome**（带 WebGL 参数）打开页面。
-不要用 Cursor 内置 Simple Browser / 预览页——那种环境里 `GL_VENDOR=Disabled`，WebGL 无法创建，和剑模型无关。
-
-若需手动打开：
-
-```bash
-bash custom_envs/unoarm/scripts/open_web_chrome.sh 7860
-```
-
-可选：`--host` / `--port` / `--settings` / `--no-open`。
-
-浏览器打开终端打印的地址后，点顶栏 **设置**：
-
-- Checkpoint（SmolVLA `pretrained_model` 目录）
-- VLM 模型名 / 路径、Device
-- 对话 LLM：API Base、API Key、模型名
-- 任务白名单（一行一条）
-- 场景 `free_space` / `reach_sword`、推理参数
-
-保存后写入 `custom_envs/unoarm/data/web_settings.json`，下次启动自动加载。未配置策略时仍可做动作设计；对话执行需先成功加载策略。
-
-顶栏可切换：
-
-- **对话**：自然语言触发 SmolVLA
-- **动作设计**：关键帧 / 播放列表 / 生成数据
-- **设置**：上述配置
-
-两种业务模式互斥：进入动作设计时会停止正在进行的 rollout。
-
-### Reach sword 场景（固定剑柄接近）
-
-在设置里将 Scene 选为 `reach_sword` 并保存。成功条件：左爪 TCP 距剑柄 < 阈值（默认 5 cm）。也可在设置中勾选「到位即结束」。
-
-- Gym 注册：`gym_unoarm/UnoarmReachSword-v0`
-- 剑位姿常量：`gym_unoarm/constants.py`
-- 任务白名单请包含：`Reach the sword handle`
-
-### 动作设计模式用法
-
-关节数值为 **MuJoCo 原始关节角（弧度）**，与 `02_test_sim.py` 滑条、`06` 的 poses JSON 一致，**不是** `[-1, 1]` 归一化值。每个滑条范围来自 MJCF 的真实 `jnt_range`。
-
-#### 1. 调姿态
-
-1. 左侧主视图会实时跟随当前 16 维关节。
-2. 右侧「当前姿态」拖动滑条调节；点击某一行选中该关节。
-3. 键盘（焦点不在输入框时）：
-   - `←` / `→`：微调当前关节
-   - `[` / `]`：切换上/下一个关节
-4. 「归零」：全部关节回到 0。
-
-#### 2. 保存关键帧（关键帧库）
-
-1. 调到想要的姿态后点「保存关键帧」，输入名称（如 `raise_left`）。
-2. 关键帧库中可：
-   - 点击选中
-   - **加载**：把该关键帧写回滑条
-   - **覆盖**：用当前滑条姿态覆盖该关键帧
-   - **删除**：删除关键帧（播放列表里同名引用也会去掉）
-
-同一关键帧可被播放列表多次引用；改关键帧后，所有引用处都会用新姿态。
-
-#### 3. 编排播放列表
-
-1. 在关键帧库选中一个关键帧，点「添加选中关键帧」（可重复添加）。
-2. 用「上移 / 下移 / 移除」调整顺序。
-3. 「预览 / 停止预览」：按列表顺序做**线性插值**播放（无噪声，仅可视化）。
-
-#### 4. 绑定任务并保存
-
-1. **任务 (English)**：填写英文指令，例如 `Prepare to fight and then taunt.`（保存时必填）。
-2. **名称**：工程名，会写成安全文件名（字母数字、`_`、`-`）。
-3. 点「保存动作」，写入：
+## 1. 模块结构
 
 ```text
-custom_envs/unoarm/data/designs/<name>.design.json   # 可再编辑的工程（关键帧库 + 播放列表）
-custom_envs/unoarm/data/designs/<name>.poses.json    # 给数据生成用的扁平 poses
+.
+├── gym_*/                 # 环境实现、常量、IK、场景和模型资产
+├── lerobot_*/             # LeRobot 环境配置与训练/评估包装
+├── data_gen/
+│   ├── scripted.py        # 关键帧插值数据
+│   ├── reach_ik.py        # 多目标 Reach-IK 数据
+│   └── table_place_ik.py  # 桌面抓取放置数据
+├── pose_design/           # 动作工程、存储、导出和预览
+├── webapp/
+│   ├── app.py             # FastAPI 路由和静态资源
+│   ├── runner.py          # 仿真、策略、生成与回放调度
+│   ├── modes.py           # 业务模式互斥
+│   ├── settings_store.py  # 设置持久化
+│   ├── llm_router.py      # 对话任务路由
+│   ├── vla_bridge_client.py # 可选远端执行桥
+│   └── ws.py              # WebSocket 快照
+├── static/web/            # HTML、CSS、JavaScript 和前端依赖
+├── scripts/               # 命令行工作流
+├── tests/                 # 单元与集成测试
+├── data/                  # 本地设置、动作工程和生成数据
+└── pyproject.toml
 ```
 
-`.poses.json` 格式与 `06_generate_scripted_data.py` 一致：
+## 2. 安装与启动
 
-```json
-{
-  "task": "Prepare to fight and then taunt.",
-  "poses": [
-    { "Left_Joint1": 0.5, "...": "..." },
-    { "Left_Joint1": 1.0, "...": "..." }
-  ]
-}
-```
-
-首尾的静止零位 `RAW_ZERO` 仍由生成脚本自动补上，无需写进 JSON。
-
-也可在终端直接用导出文件生成数据：
+从当前目录安装：
 
 ```bash
-uv run python custom_envs/unoarm/scripts/06_generate_scripted_data.py \
-  --poses-json custom_envs/unoarm/data/designs/<name>.poses.json \
-  --episodes 30 --overwrite
+uv pip install -e .
 ```
 
-默认策略是**条间多样性、轨迹内不抖**：
-
-- `--pose-jitter-std=0.05`：每条 episode 给全部关键帧加同一组小偏移（弧度），轨迹仍平滑
-- `--midpoint-noise-std=0` / `--hold-noise-std=0`：不要开帧间抖动，否则回放和策略都会发抖
-- `--hold-steps=2`、`--segment-steps=20`：减少冗余静止帧
-
-### Reach-IK 自动抓取采数（多目标点）
-
-无需手调关节关键帧：给定剑柄目标点（JSON 列表或工作空间 AABB 随机采样），用 MuJoCo DLS IK 生成 **接近 → 抓取 → 掠过执行点** 的右臂轨迹并落盘。
+仿真检查：
 
 ```bash
-# 点列表
-uv run python custom_envs/unoarm/scripts/10_generate_reach_ik_data.py \
-  --targets-json custom_envs/unoarm/data/targets_reach_ik_example.json \
-  --episodes-per-target 1 --overwrite
-
-# 或在盒子内随机采样
-uv run python custom_envs/unoarm/scripts/10_generate_reach_ik_data.py \
-  --bbox-min -0.45 -0.65 0.95 \
-  --bbox-max -0.20 -0.40 1.15 \
-  --num-targets 40 --seed 0 --overwrite
+uv run python scripts/02_test_sim.py
 ```
 
-TCP 姿态固定（夹爪 +X 朝 −Y）；执行点默认 `DEFAULT_EXECUTION_POINT_POS`，可用 `--execution-point` 覆盖。
+启动网页：
 
-Web 控制台顶栏也有 **Reach-IK** 页：可切换 JSON / AABB 生成，并在左侧 3D 场景回放已生成数据集。
+```bash
+uv run python scripts/09_web_interact.py
+```
 
-#### 5. 已保存动作与 Web 内生成数据
+常用启动参数可通过帮助查看：
 
-「已保存动作」列表中：
+```bash
+uv run python scripts/09_web_interact.py --help
+```
 
-- **打开**：加载工程到当前编辑器
-- **删除**：删除对应的 `.design.json` / `.poses.json`
-- 选中一项后，填写 Episodes / Segment steps / Hold steps / Pose jitter，勾选是否 Overwrite，点「生成数据」
+浏览器需支持 WebGL。若自动打开失败，可手动访问终端打印的地址。
 
-生成在 Web 进程内后台执行（逻辑与 `06` 相同），状态显示在生成区域；生成期间会锁定设计编辑。数据集默认写到：
+---
+
+## 3. 环境规格
+
+- 控制频率：20 Hz
+- 时间步长：0.05 秒
+- 动作维度：16
+- 状态维度：16
+- 相机：顶视、左腕、右腕
+- 图像：RGB，480×640
+- 机械臂：左右各 7 个关节
+- 末端：左右各 1 个夹爪控制量
+
+动作索引：
 
 ```text
-custom_envs/unoarm/data/unoarm_<name>/
+[左臂 J1..J7, 左夹爪, 右臂 J1..J7, 右夹爪]
 ```
 
-### 相关模块
+动作设计页面显示 MuJoCo 原始弧度值；策略特征可使用归一化表示。修改数据或接口时必须明确单位。
 
-| 路径                         | 作用                                  |
-| ---------------------------- | ------------------------------------- |
-| `scripts/09_web_interact.py` | 启动入口                              |
-| `webapp/`                    | FastAPI、模式切换、仿真 Runner        |
-| `pose_design/`               | 关键帧 / 播放列表 / 导出 / 预览       |
-| `data_gen/`                  | 插值扰动数据集生成（CLI 与 Web 共用） |
-| `static/web/`                | 前端页面                              |
+---
 
-## Smoke tests
+## 4. 网页控制台
+
+顶部功能包括：
+
+- 对话
+- 动作设计
+- 目标位姿
+- Reach-IK
+- 验证
+- 设置
+
+左侧可显示三路观测相机，中间显示 Three.js 场景，右侧根据模式显示控制面板。
+
+### 4.1 对话模式
+
+LLM 路由器将用户输入分类为闲聊或动作请求。动作请求必须匹配允许任务列表，随后由 Runner 调用策略。未加载 checkpoint 时仍可使用动作设计和数据工具，但不能执行策略 rollout。
+
+### 4.2 动作设计模式
+
+1. 用 16 个滑块调整姿态。
+2. 保存关键帧并命名。
+3. 添加关键帧到播放列表。
+4. 调整顺序，预览插值。
+5. 填写任务文本和工程名。
+6. 保存动作工程。
+7. 选择 episode 和随机化参数生成数据。
+
+关键帧可以被播放列表重复引用；修改关键帧后，所有引用使用最新姿态。
+
+### 4.3 目标位姿
+
+目标位姿页面用于调整场景道具、抓取点和可选执行点。设置通过后端写入场景并广播快照，Three.js 展示应与 MuJoCo 状态一致。
+
+### 4.4 Reach-IK
+
+支持目标列表和工作空间随机采样。生成任务在后台执行，期间进入独占生成模式，避免设计或 rollout 同时修改环境。
+
+### 4.5 验证
+
+验证页用于加载 checkpoint、选择场景和运行 episode。桌面任务应关注抓取、抬升、搬运、释放和最终落点等阶段指标。
+
+### 4.6 设置
+
+设置包括模型、设备、LLM、任务白名单、场景、目标位姿、rollout、显示和桥接参数。API 密钥优先通过指定环境变量读取。
+
+---
+
+## 5. 数据生成
+
+### 5.1 手动录制
 
 ```bash
-uv run python -c "import gym_unoarm, gymnasium as gym; env = gym.make('gym_unoarm/UnoarmFreeSpace-v0'); obs, _ = env.reset(); print(obs['agent_pos'].shape); env.close()"
-uv run python -c "import lerobot_unoarm; from lerobot.envs.configs import EnvConfig; print(EnvConfig.get_choice_class('unoarm'))"
+uv run python scripts/03_record_data.py
 ```
 
-## Recording
+典型键盘操作：
+
+- 空格：切换左右臂
+- 数字键：增加所选关节目标
+- 字母键：减少所选关节目标
+- `g`：切换夹爪
+- 回车：保存 episode
+- `r`：丢弃并重置
+- `Esc`：结束录制
+
+具体键位以脚本当前帮助为准。
+
+### 5.2 关键帧生成
 
 ```bash
-uv run python custom_envs/unoarm/scripts/03_record_data.py
+uv run python scripts/06_generate_scripted_data.py --help
 ```
 
-Keyboard controls:
+关键参数：
 
-- `space`: switch left/right arm.
-- `1..7`: increase the selected arm joint target.
-- `q..u`: decrease the selected arm joint target.
-- `g`: toggle selected gripper.
-- `enter`: save the current episode.
-- `r`: discard and reset the current episode.
-- `esc`: finalize and exit.
+| 参数 | 含义 |
+| --- | --- |
+| `--poses-json` | 任务和关键帧文件 |
+| `--episodes` | episode 数 |
+| `--segment-steps` | 相邻姿态间插值帧数 |
+| `--hold-steps` | 关键姿态保持帧数 |
+| `--pose-jitter-std` | episode 级姿态扰动 |
+| `--midpoint-noise-std` | 插值路径扰动 |
+| `--hold-noise-std` | 保持段扰动 |
+| `--seed` | 随机种子 |
+| `--overwrite` | 覆盖已有输出 |
+
+推荐以 episode 级扰动为主，避免逐帧噪声导致轨迹抖动。
+
+### 5.3 Reach-IK
+
+```bash
+uv run python scripts/10_generate_reach_ik_data.py --help
+```
+
+生成器可使用目标 JSON 或三维 AABB 采样。每个目标会经过 IK 求解、关节限位检查、关键阶段构造、插值和数据写入。
+
+### 5.4 桌面放置
+
+桌面生成逻辑位于 `data_gen/table_place_ik.py`，主要处理物体位置采样、净空约束、TCP 偏移、抓取与放置关键路径，以及生成元数据。
+
+---
+
+## 6. 数据回放
+
+```bash
+uv run python scripts/07_replay_dataset.py --help
+```
+
+回放检查重点：
+
+- 模型动作是否符合任务
+- 相机是否完整
+- 物体初始状态是否从元数据恢复
+- 夹爪时序是否正确
+- 状态重现误差是否接近零
+- episode 间是否存在合理多样性
+
+不要跳过回放直接训练。数据中的错误通常会被策略稳定地学会。
+
+---
+
+## 7. 推理与评估
+
+终端交互：
+
+```bash
+uv run python scripts/08_interact.py
+```
+
+通用验证：
+
+```bash
+uv run python scripts/05_eval.py --help
+```
+
+桌面放置评估：
+
+```bash
+uv run python scripts/05_eval_table_place.py --help
+```
+
+推理链路包括观测采集、特征预处理、模型动作块预测、后处理、EMA、变化量限制和逐步执行。checkpoint 必须与训练时的相机映射、状态维度、动作维度和处理器配置一致。
+
+---
+
+## 8. 模式与并发
+
+后端主要业务状态包括对话、设计和生成。生成任务为独占状态：
+
+- 已在生成时不能再次启动生成。
+- 生成期间不能切换到会修改环境的模式。
+- 退出生成后恢复到设计模式。
+- 切换业务模式时应停止冲突的 rollout 或预览。
+
+该约束用于避免后台线程和用户操作同时写入环境状态。
+
+---
+
+## 9. 实时状态
+
+WebSocket 向前端发送环境快照，包括：
+
+- 关节位置
+- 当前模式
+- rollout 状态
+- 任务和步数
+- 场景参数
+- 目标距离
+- 成功状态
+- 相机图像
+- 生成进度
+- 系统消息
+
+前端根据快照更新三维模型，不把浏览器中的视觉状态视为后端真值。
+
+---
+
+## 10. 远端执行桥接
+
+桥接客户端允许把策略动作发送给独立执行服务。配置包括：
+
+- 是否启用
+- 服务地址
+- 执行手臂
+- 是否真正执行
+- 结果等待超时
+- HTTP 超时
+
+推荐先关闭真正执行，只验证请求结构、关节顺序、单位、响应和错误处理。实体执行必须额外配置硬件限位、速度限制、碰撞检测和急停。
+
+---
+
+## 11. 测试
+
+运行全部自定义测试：
+
+```bash
+uv run pytest tests -v
+```
+
+重点测试：
+
+```bash
+uv run pytest tests/test_ik.py -v
+uv run pytest tests/test_pose_design.py -v
+uv run pytest tests/test_reach_ik_datagen.py -v
+uv run pytest tests/test_table_place_env.py -v
+uv run pytest tests/test_table_place_ik_datagen.py -v
+uv run pytest tests/test_webapp_modes.py -v
+uv run pytest tests/test_settings_store.py -v
+uv run pytest tests/test_vla_bridge_client.py -v
+```
+
+涉及前端变更时，除自动测试外还需手动检查：
+
+1. 页面加载无控制台错误。
+2. URDF 和网格资源正常。
+3. 三维关节与后端状态一致。
+4. 三路相机可显示。
+5. 模式切换和生成锁正确。
+6. WebSocket 断线后能恢复。
+7. 日间和夜间主题均可用。
+
+---
+
+## 12. 开发约定
+
+- 场景常量集中维护，避免前后端各自复制不同数值。
+- 生成器和 Web 应复用同一核心函数。
+- 新场景必须提供可复现的 reset 参数。
+- 元数据应足以恢复回放场景。
+- 对公开 API 增加测试。
+- 不提交数据集、checkpoint、缓存、密钥或本机绝对路径。
+- 修改动作顺序、单位、相机键时视为破坏性接口变更。
+- 真实执行相关改动必须先在仿真和仅验证模式中测试。
+
+---
+
+## 13. 故障排查
+
+### WebGL 创建失败
+
+使用支持硬件加速的现代浏览器，检查 GPU 是否被禁用。某些编辑器内置预览器不提供完整 WebGL。
+
+### 模型资源加载失败
+
+检查后端静态挂载、资源路径和文件权限；通过浏览器网络面板确认 URDF 与网格请求状态。
+
+### 设置保存后不生效
+
+确认保存请求成功、设置文件可写，并检查后端是否对字符串、布尔值和三维向量进行了规范化。
+
+### IK 不收敛
+
+检查目标是否在工作空间内、TCP 偏移和目标姿态是否合理、初始姿态是否接近奇异位形，并适当调整阻尼和迭代参数。
+
+### 生成任务卡住
+
+查看后台日志和生成状态，确认没有旧任务占用生成模式；检查输出目录、磁盘空间和视频编码依赖。
+
+### 策略动作维度错误
+
+确认 checkpoint、数据集和当前环境均使用相同的 16 维关节顺序，检查预处理与后处理文件是否来自同一 checkpoint。

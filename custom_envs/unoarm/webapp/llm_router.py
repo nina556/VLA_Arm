@@ -18,7 +18,7 @@ DEFAULT_BASE_URL = "https://api.siliconflow.cn/v1"
 DEFAULT_MODEL = "THUDM/GLM-4-9B-0414"
 DEFAULT_TIMEOUT_S = 20.0
 
-_SYSTEM_PROMPT = """你是 Unoarm 双臂机器人的语音助手路由器。判断用户输入是闲聊还是要机器人执行动作。
+_SYSTEM_PROMPT = """你是双臂机器人的语音助手路由器。判断用户输入是闲聊还是要机器人执行动作。
 
 你的职责：
 1. 如果用户闲聊、问候、提问、或输入与机器人动作无关，输出 chat，reply 用中文自然回复。

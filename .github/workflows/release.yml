@@ -15,11 +15,8 @@
 name: Create Release and Publish to PyPI
 
 on:
-  push:
-    tags:
-      - 'v*.*.*' # Trigger on tags like v0.1.0, v1.0.0
-
-# Sets up the environment variables
+  # All workflows are opt-in for this standalone repository.
+  workflow_dispatch:
 env:
   UV_VERSION: "0.8.0"
   PYTHON_VERSION: "3.12"

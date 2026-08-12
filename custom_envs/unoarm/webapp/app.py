@@ -190,11 +190,20 @@ def _http_mode_error(exc: ModeError) -> HTTPException:
 
 
 def build_app(runner: UnoarmWebRunner) -> FastAPI:
-    app = FastAPI(title="Unoarm VLA Web")
+    app = FastAPI(title="VLA 机器人交互控制台")
     app.mount("/urdf", StaticFiles(directory=str(ROOT / "gym_unoarm")), name="urdf")
+    app.mount(
+        "/robot/meshes",
+        StaticFiles(directory=str(ROOT / "gym_unoarm" / "meshes")),
+        name="robot-meshes",
+    )
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     if DATA_DIR.is_dir():
         app.mount("/assets", StaticFiles(directory=str(DATA_DIR)), name="assets")
+
+    @app.get("/robot/model.urdf", include_in_schema=False)
+    async def robot_model() -> FileResponse:
+        return FileResponse(ROOT / "gym_unoarm" / "unoarm_mujoco.urdf", media_type="application/xml")
 
     @app.middleware("http")
     async def no_cache_frontend_js(request, call_next):

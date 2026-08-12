@@ -19,8 +19,7 @@
 name: Fast Tests
 
 on:
-  # Upstream tests depend on LFS fixtures omitted from this standalone repo.
-  # Keep the workflow available for explicit runs after fixtures are restored.
+  # All workflows are opt-in for this standalone repository.
   workflow_dispatch:
 
 permissions:

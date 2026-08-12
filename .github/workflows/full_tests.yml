@@ -16,8 +16,7 @@
 name: Full Tests
 
 on:
-  # The upstream suite requires LFS fixtures, organization secrets, and
-  # private runner groups. Run it explicitly when that infrastructure exists.
+  # All workflows are opt-in for this standalone repository.
   workflow_dispatch:
 
 permissions:

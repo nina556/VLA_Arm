@@ -25,7 +25,7 @@ const OBS_CAM_ELS = {
   left_wrist: camLeftWrist,
   right_wrist: camRightWrist,
 };
-const OBS_PREVIEW_KEY = "unoarm.obsPreviewOpen";
+const OBS_PREVIEW_KEY = "robot.obsPreviewOpen";
 
 function readObsPreviewPref() {
   try {
@@ -322,7 +322,7 @@ function setArmSide(side) {
   armSide = side === "left" ? "left" : "right";
   document.getElementById("armSideLeftBtn")?.classList.toggle("active", armSide === "left");
   document.getElementById("armSideRightBtn")?.classList.toggle("active", armSide === "right");
-  window.dispatchEvent(new CustomEvent("unoarm:arm-side", { detail: { side: armSide } }));
+  window.dispatchEvent(new CustomEvent("robot:arm-side", { detail: { side: armSide } }));
 }
 
 function pickReachFields(data) {
